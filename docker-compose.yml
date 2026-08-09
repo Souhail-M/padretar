@@ -1,0 +1,15 @@
+# Front only. The backend is Convex (hosted), so there is no API container,
+# no database container, and nothing to back up here — the shop's data lives
+# in the Convex production deployment.
+services:
+  web:
+    build:
+      context: .
+      args:
+        # The production Convex deployment URL, from `npx convex deploy`.
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+    restart: unless-stopped
+    ports:
+      # Put a TLS-terminating reverse proxy in front of this. The QR scanner
+      # will not work over plain HTTP.
+      - "8080:80"

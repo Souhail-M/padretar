@@ -46,6 +46,47 @@ Toutes les frontières de journée passent par `convex/lib/day.ts` (fuseau
 Europe/Paris, changements d'heure compris). Convex tourne en UTC : ne pas
 calculer de date ailleurs.
 
+## Déploiement
+
+Le back-end est Convex (hébergé) : il n'y a ni serveur d'API ni base de
+données à installer. On ne déploie que le front, un paquet de fichiers
+statiques.
+
+**Déploiements Convex :**
+
+| | URL |
+|---|---|
+| dev | `https://groovy-hare-598.eu-west-1.convex.cloud` |
+| **prod** | `https://hardy-dragon-575.eu-west-1.convex.cloud` |
+
+Les deux ont leurs propres `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL` et
+`ADMIN_EMAIL` — les clés d'un déploiement ne valent jamais pour l'autre.
+
+```bash
+npx convex deploy            # pousse les fonctions en production
+npx convex env list --prod   # vérifie les variables de production
+```
+
+**Front :**
+
+```bash
+docker compose up -d --build       # lit VITE_CONVEX_URL de l'environnement
+# ou, sans compose :
+docker build --build-arg VITE_CONVEX_URL=https://hardy-dragon-575.eu-west-1.convex.cloud -t padretar .
+docker run -d -p 8080:80 padretar
+```
+
+> ⚠️ **TLS obligatoire.** Le scan de QR utilise `getUserMedia`, que les
+> navigateurs n'exposent que dans un *secure context* : HTTPS, ou `localhost`.
+> Servi en HTTP simple sur une IP de réseau local, l'appareil photo n'est pas
+> refusé — l'API est absente, et l'employé retombe sur la saisie manuelle du
+> code. Mettre un reverse proxy TLS (Caddy, Traefik, nginx + Let's Encrypt)
+> devant le conteneur.
+
+> ⚠️ `SITE_URL` en production vaut `https://padretar.local`, un
+> **placeholder**. Une fois le vrai domaine connu :
+> `npx convex env set --prod SITE_URL https://votre-domaine`
+
 ## Structure
 
 ```
