@@ -75,27 +75,36 @@ export function PunchDialog({
   // Bumped to re-run the camera effect when the employee retries.
   const [attempt, setAttempt] = useState(0);
 
-  // `submitting` guards against the scanner firing repeatedly on the same code
-  // while the mutation is still in flight — otherwise one scan punches twice.
+  // The camera decodes the same QR several times a second. Without a latch,
+  // one scan records an entry and then immediately an exit: the first punch
+  // resolves, the guard clears, and the dialog is still closing with the code
+  // in view. So the latch is only released on failure — a success keeps it
+  // shut and the dialog goes away.
   const submitting = useRef(false);
+  const scannerRef = useRef<QrScanner | null>(null);
 
   async function send(code: string) {
     if (submitting.current) return;
     submitting.current = true;
+    // Stop feeding decodes before awaiting anything.
+    scannerRef.current?.pause();
     setBusy(true);
+
     try {
       const type = await punch({ code });
       toast.success(type === "in" ? "Entrée enregistrée" : "Sortie enregistrée");
       setManual("");
       onOpenChange(false);
+      // Deliberately not releasing the latch here.
     } catch (error) {
       toast.error(
         error instanceof Error && error.message.includes("Code invalide")
           ? "Code invalide ou expiré. Regardez à nouveau l'écran."
           : "Pointage impossible.",
       );
-    } finally {
       submitting.current = false;
+      void scannerRef.current?.start();
+    } finally {
       setBusy(false);
     }
   }
@@ -112,6 +121,8 @@ export function PunchDialog({
     // Waits for the element rather than bailing out; see setVideoEl above.
     if (!open || !videoEl) return;
 
+    // Fresh dialog, fresh latch — the previous session closes it on success.
+    submitting.current = false;
     setCameraError(null);
 
     // Browsers expose getUserMedia only in a secure context (https, or
@@ -132,6 +143,8 @@ export function PunchDialog({
       },
     );
 
+    scannerRef.current = scanner;
+
     let cancelled = false;
     scanner.start().catch((error: unknown) => {
       if (cancelled) return;
@@ -144,6 +157,7 @@ export function PunchDialog({
 
     return () => {
       cancelled = true;
+      scannerRef.current = null;
       scanner.destroy();
     };
   }, [open, videoEl, attempt]);

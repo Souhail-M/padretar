@@ -59,12 +59,49 @@ describe("punch", () => {
     );
   });
 
-  test("first punch of the day is an entry, the next one is an exit", async () => {
-    const { as, code } = await shopWith();
+  test("first punch of the day is an entry, a later one is an exit", async () => {
+    const { t, as, code, userId } = await shopWith();
 
     expect(await as.mutation(api.badges.punch, { code })).toBe("in");
+
+    // Push that punch outside the duplicate window so the next one counts as a
+    // genuine second gesture rather than the same scan decoded again.
+    await t.run(async (ctx) => {
+      const last = await ctx.db
+        .query("badges")
+        .withIndex("by_user_at", (q) => q.eq("userId", userId as Id<"users">))
+        .order("desc")
+        .first();
+      await ctx.db.patch(last!._id, { at: Date.now() - 60_000 });
+    });
+
     expect(await as.mutation(api.badges.punch, { code })).toBe("out");
+  });
+
+  test("one scan decoded twice does not record an entry and an exit", async () => {
+    const { as, code } = await shopWith();
+
+    // The camera decodes the same QR several times a second.
     expect(await as.mutation(api.badges.punch, { code })).toBe("in");
+    expect(await as.mutation(api.badges.punch, { code })).toBe("in");
+    expect(await as.mutation(api.badges.punch, { code })).toBe("in");
+
+    const days = await as.query(api.badges.mine, {});
+    expect(days[0].punches).toHaveLength(1);
+    expect(days[0].incomplete).toBe(true); // still inside, no exit invented
+  });
+
+  test("concurrent decodes of the same scan still record one punch", async () => {
+    const { as, code } = await shopWith();
+
+    const results = await Promise.all([
+      as.mutation(api.badges.punch, { code }),
+      as.mutation(api.badges.punch, { code }),
+    ]);
+    expect(results).toEqual(["in", "in"]);
+
+    const days = await as.query(api.badges.mine, {});
+    expect(days[0].punches).toHaveLength(1);
   });
 
   test("accepts a lowercase code typed by hand", async () => {

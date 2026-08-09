@@ -9,6 +9,17 @@ import { dayKey, timeLabel } from "./lib/day";
  *  roughly a year for one person. */
 const HISTORY_LIMIT = 800;
 
+/**
+ * Two punches this close together are the same gesture, not two.
+ *
+ * The camera decodes the same QR several times a second, so one scan can
+ * easily fire twice and record an entry immediately followed by an exit. The
+ * scanner is paused on the first hit, but that is client-side timing and this
+ * is an attendance record — the backend refuses the duplicate itself rather
+ * than trusting the UI. Nobody arrives and leaves within fifteen seconds.
+ */
+const DEDUP_WINDOW_MS = 15_000;
+
 /** The user's most recent punch, or null. */
 async function lastPunch(ctx: QueryCtx, userId: Id<"users">) {
   return await ctx.db
@@ -49,8 +60,15 @@ export const punch = mutation({
     }
 
     const last = await lastPunch(ctx, user._id);
-    const type = isIn(last, now) ? ("out" as const) : ("in" as const);
 
+    // Same gesture arriving twice: report what was already recorded and insert
+    // nothing, so a repeated decode cannot turn one arrival into an
+    // arrival-plus-departure.
+    if (last && now - last.at < DEDUP_WINDOW_MS) {
+      return last.type;
+    }
+
+    const type = isIn(last, now) ? ("out" as const) : ("in" as const);
     await ctx.db.insert("badges", { userId: user._id, at: now, type });
     return type;
   },
