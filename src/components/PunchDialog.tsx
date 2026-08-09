@@ -65,6 +65,20 @@ export function PunchDialog({
     if (!open || !videoRef.current) return;
 
     setCameraError(null);
+
+    // Browsers only expose getUserMedia in a secure context (HTTPS, or
+    // localhost). Over plain HTTP on a LAN address navigator.mediaDevices is
+    // not merely refused — it is undefined, so no permission prompt ever
+    // appears and the camera looks broken. Say that plainly instead.
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+      setCameraError(
+        "Le scan par caméra exige une connexion sécurisée (https). " +
+          "Sur cette adresse, le navigateur n'autorise pas la caméra. " +
+          "Saisissez le code affiché sur l'écran.",
+      );
+      return;
+    }
+
     const scanner = new QrScanner(
       videoRef.current,
       (result) => void send(result.data),
@@ -73,7 +87,8 @@ export function PunchDialog({
 
     scanner.start().catch(() => {
       setCameraError(
-        "Caméra indisponible. Saisissez le code affiché sur l'écran.",
+        "Caméra inaccessible. Vérifiez l'autorisation dans le navigateur, " +
+          "ou saisissez le code affiché sur l'écran.",
       );
     });
 

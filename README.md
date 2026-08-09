@@ -67,21 +67,42 @@ npx convex deploy            # pousse les fonctions en production
 npx convex env list --prod   # vérifie les variables de production
 ```
 
-**Front :**
+**Front — Coolify :**
+
+1. **New Resource → Public/Private Repository** → `Souhail-M/padretar`, branche `main`.
+2. **Build Pack : `Dockerfile`.** (Pas Nixpacks, pas Docker Compose — le
+   `docker-compose.yml` du dépôt ne sert qu'à un hébergement manuel.)
+3. **Environment Variables** — ajouter, et **cocher « Build Variable »** :
+
+   ```
+   VITE_CONVEX_URL=https://hardy-dragon-575.eu-west-1.convex.cloud
+   ```
+
+   C'est le point qui casse tout si on l'oublie : Vite fige cette valeur
+   **au moment du build**, donc une variable seulement runtime n'a aucun
+   effet. Le build échoue exprès dans ce cas, avec le message qui explique
+   quoi cocher, plutôt que de livrer une app qui ne se connecte à rien.
+4. **Port : `80`.** Health check : `/health`.
+5. **Domaine** — renseigner le domaine dans Coolify, qui obtient le
+   certificat Let's Encrypt tout seul.
+6. Déployer. Puis pointer `SITE_URL` sur ce domaine :
+   `npx convex env set --prod SITE_URL https://votre-domaine`
+
+Hébergement manuel, sans Coolify :
 
 ```bash
 docker compose up -d --build       # lit VITE_CONVEX_URL de l'environnement
-# ou, sans compose :
+# ou :
 docker build --build-arg VITE_CONVEX_URL=https://hardy-dragon-575.eu-west-1.convex.cloud -t padretar .
 docker run -d -p 8080:80 padretar
 ```
 
-> ⚠️ **TLS obligatoire.** Le scan de QR utilise `getUserMedia`, que les
-> navigateurs n'exposent que dans un *secure context* : HTTPS, ou `localhost`.
-> Servi en HTTP simple sur une IP de réseau local, l'appareil photo n'est pas
-> refusé — l'API est absente, et l'employé retombe sur la saisie manuelle du
-> code. Mettre un reverse proxy TLS (Caddy, Traefik, nginx + Let's Encrypt)
-> devant le conteneur.
+> ⚠️ **HTTPS obligatoire pour le scan.** `getUserMedia` n'existe que dans un
+> *secure context* : HTTPS, ou `localhost`. Sur `http://192.168.x.x`, le
+> navigateur ne refuse pas la caméra — **l'API est absente**, donc aucune
+> demande d'autorisation n'apparaît et le scan semble cassé. L'app le dit
+> maintenant explicitement et bascule sur la saisie du code. Coolify fournit
+> le TLS : une fois déployé derrière son domaine, la caméra s'ouvre.
 
 > ⚠️ `SITE_URL` en production vaut `https://padretar.local`, un
 > **placeholder**. Une fois le vrai domaine connu :
