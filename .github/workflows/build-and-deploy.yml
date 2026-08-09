@@ -1,0 +1,94 @@
+name: Build and deploy
+
+# The image is built here, not on the server. Coolify only pulls and runs it,
+# so a deploy costs the server nothing and never dies mid-build.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A newer push makes an in-flight build pointless.
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  verify:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  build:
+    name: Build and push image
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR rejects uppercase, and the owner here is "Souhail-M".
+      - name: Resolve image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          # Vite inlines this at build time, so it has to be supplied HERE —
+          # setting it in Coolify does nothing now that the build has moved.
+          # It is a public URL, not a secret: the browser connects to it
+          # directly. Override per environment with a repository variable.
+          build-args: |
+            VITE_CONVEX_URL=${{ vars.VITE_CONVEX_URL || 'https://hardy-dragon-575.eu-west-1.convex.cloud' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Optional: skipped cleanly until the two secrets exist, so the first
+      # runs stay green while Coolify is still being set up.
+      - name: Trigger Coolify redeploy
+        if: env.COOLIFY_WEBHOOK != ''
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request GET "$COOLIFY_WEBHOOK" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN"
+
+      - name: Note when deploy is not wired up
+        if: env.COOLIFY_WEBHOOK == ''
+        run: |
+          echo "Image pushed. COOLIFY_WEBHOOK is not set, so no redeploy was triggered."
+          echo "Add COOLIFY_WEBHOOK and COOLIFY_TOKEN in repo Settings → Secrets → Actions."

@@ -1,15 +1,26 @@
-# Front only. The backend is Convex (hosted), so there is no API container,
-# no database container, and nothing to back up here — the shop's data lives
-# in the Convex production deployment.
+# Front only. The backend is Convex (hosted), so there is no API container and
+# no database container here — the shop's data lives in the Convex deployment.
+#
+# There is deliberately no `build:` key. The image is built and pushed by
+# .github/workflows/build-and-deploy.yml, and Coolify only pulls and runs it.
+# Adding `build:` back would move the build onto the server again.
 services:
   web:
-    build:
-      context: .
-      args:
-        # The production Convex deployment URL, from `npx convex deploy`.
-        VITE_CONVEX_URL: ${VITE_CONVEX_URL}
+    image: ghcr.io/souhail-m/padretar:latest
     restart: unless-stopped
-    ports:
-      # Put a TLS-terminating reverse proxy in front of this. The QR scanner
-      # will not work over plain HTTP.
-      - "8080:80"
+
+    environment:
+      # Coolify replaces this with the domain set in its UI and routes that
+      # domain to port 80. TLS is terminated by Coolify's proxy — which is
+      # what makes the QR scanner work, since getUserMedia needs https.
+      - SERVICE_FQDN_WEB_80
+
+    expose:
+      - "80"
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

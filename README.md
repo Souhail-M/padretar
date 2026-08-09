@@ -67,32 +67,56 @@ npx convex deploy            # pousse les fonctions en production
 npx convex env list --prod   # vérifie les variables de production
 ```
 
-**Front — Coolify :**
+**Front — GitHub Actions → GHCR → Coolify**
 
-1. **New Resource → Public/Private Repository** → `Souhail-M/padretar`, branche `main`.
-2. **Build Pack : `Dockerfile`.** (Pas Nixpacks, pas Docker Compose — le
-   `docker-compose.yml` du dépôt ne sert qu'à un hébergement manuel.)
-3. **Environment Variables** — ajouter, et **cocher « Build Variable »** :
+L'image est construite sur GitHub, pas sur le serveur. Coolify se contente de
+tirer l'image et de la lancer : un déploiement ne coûte plus rien au serveur
+et ne peut plus mourir en plein build.
 
-   ```
-   VITE_CONVEX_URL=https://hardy-dragon-575.eu-west-1.convex.cloud
-   ```
+```text
+push main → Actions (typecheck, tests, docker build) → GHCR → Coolify (pull + run)
+```
 
-   C'est le point qui casse tout si on l'oublie : Vite fige cette valeur
-   **au moment du build**, donc une variable seulement runtime n'a aucun
-   effet. Le build échoue exprès dans ce cas, avec le message qui explique
-   quoi cocher, plutôt que de livrer une app qui ne se connecte à rien.
-4. **Port : `80`.** Health check : `/health`.
-5. **Domaine** — renseigner le domaine dans Coolify, qui obtient le
-   certificat Let's Encrypt tout seul.
-6. Déployer. Puis pointer `SITE_URL` sur ce domaine :
-   `npx convex env set --prod SITE_URL https://votre-domaine`
+Image : `ghcr.io/souhail-m/padretar` — tags `latest` et le SHA du commit, pour
+savoir exactement ce qui tourne.
 
-Hébergement manuel, sans Coolify :
+*Côté Coolify :*
+
+1. **New Resource → Public Repository** → `Souhail-M/padretar`, branche `main`
+2. **Build Pack : `Docker Compose`** — le `docker-compose.yml` du dépôt n'a
+   **pas** de clé `build:`, il pointe sur l'image GHCR. C'est ce qui déplace
+   le build hors du serveur.
+3. **Domaine** : le renseigner dans Coolify. `SERVICE_FQDN_WEB_80` dans le
+   compose le câble sur le port 80, et Coolify obtient le certificat.
+4. Health check : `/health` (déjà dans le compose et le Dockerfile).
+5. **Auto Deploy** : décocher. C'est Actions qui déclenche le redéploiement,
+   une fois l'image poussée — sinon Coolify redéploie avant que la nouvelle
+   image existe.
+
+*Côté GitHub — `Settings → Secrets and variables → Actions` :*
+
+| Nom | Type | Rôle |
+|---|---|---|
+| `COOLIFY_WEBHOOK` | Secret | URL de redéploiement de la ressource Coolify |
+| `COOLIFY_TOKEN` | Secret | Token API Coolify (`Settings → API Access`) |
+| `VITE_CONVEX_URL` | **Variable** | Optionnel — surcharge le déploiement Convex visé |
+
+Tant que les deux secrets sont absents, le workflow pousse l'image et saute
+proprement l'étape de déploiement : les premiers runs restent verts pendant
+que Coolify se configure.
+
+> ⚠️ **Le piège de la migration.** `VITE_CONVEX_URL` est figé par Vite
+> **pendant le build**. Maintenant que le build a quitté Coolify, le régler
+> dans Coolify **n'a plus aucun effet** — il doit être fourni à GitHub
+> Actions. Il est en dur dans le workflow, avec une variable de dépôt pour le
+> surcharger. Ce n'est pas un secret : le navigateur s'y connecte
+> directement.
+
+*Hébergement manuel, sans Coolify :*
 
 ```bash
-docker compose up -d --build       # lit VITE_CONVEX_URL de l'environnement
-# ou :
+docker compose up -d          # tire l'image publiée
+# ou en construisant localement :
 docker build --build-arg VITE_CONVEX_URL=https://hardy-dragon-575.eu-west-1.convex.cloud -t padretar .
 docker run -d -p 8080:80 padretar
 ```
