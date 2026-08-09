@@ -7,6 +7,10 @@
 services:
   web:
     image: ghcr.io/souhail-m/padretar:latest
+    # :latest is a moving tag, and Docker will happily reuse a local copy under
+    # that name — a deploy then "succeeds" while still running the previous
+    # build. Caught on KatabAI, where a green build kept serving the old image.
+    pull_policy: always
     restart: unless-stopped
 
     environment:
