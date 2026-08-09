@@ -8,6 +8,7 @@ import { DayList } from "@/components/DayList";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatMinutes, longDate, timeLabel } from "@/lib/format";
+import { minutesSince, useNow } from "@/lib/useNow";
 
 export function Home() {
   const [scanning, setScanning] = useState(false);
@@ -15,7 +16,11 @@ export function Home() {
   const days = useQuery(api.badges.mine);
   const today = useQuery(api.shifts.myToday);
 
+  // The server cannot tick: a Convex query re-runs on data change, not on the
+  // clock. The elapsed time is derived here so it keeps counting.
+  const now = useNow();
   const isIn = status?.isIn ?? false;
+  const elapsed = status?.since ? minutesSince(status.since, now) : null;
 
   return (
     <div className="space-y-8">
@@ -32,16 +37,23 @@ export function Home() {
             isIn ? "text-primary-foreground/70" : "text-muted-foreground",
           )}
         >
-          {status === undefined ? " " : isIn ? "Vous êtes" : "Vous êtes"}
+          Vous êtes
         </p>
         <p className="wordmark mt-2 text-4xl">
           {status === undefined ? "…" : isIn ? "Dedans" : "Dehors"}
         </p>
-        {status?.since && (
-          <p className="tnum mt-2 text-sm opacity-70">
-            depuis {timeLabel(status.since)}
-          </p>
-        )}
+
+        {status !== undefined &&
+          (isIn && status.since ? (
+            <p className="tnum mt-2 text-sm opacity-70">
+              Entré à {timeLabel(status.since)}
+              {elapsed !== null && ` · ${formatMinutes(elapsed)} sur place`}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Aucune entrée en cours aujourd'hui.
+            </p>
+          ))}
       </section>
 
       <Button size="lg" className="h-16 w-full text-base" onClick={() => setScanning(true)}>

@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { requireActive, requireAdmin } from "./lib/auth";
-import { dayKey, formatMinutes, timeLabel } from "./lib/day";
+import { dayKey, timeLabel } from "./lib/day";
 
 /** How far back the history screens look. A shop punches ~4x/day, so this is
  *  roughly a year for one person. */
@@ -147,6 +147,14 @@ export const forEmployee = query({
 });
 
 /** Who is clocked in right now. Admin only — drives the dashboard. */
+/**
+ * Who is clocked in right now, for the admin dashboard.
+ *
+ * Returns `sinceAt` as a raw timestamp rather than a formatted duration on
+ * purpose: a Convex query only re-runs when the data it read changes, so a
+ * duration computed here with Date.now() would freeze until the next punch.
+ * The client ticks it instead — that is what makes the dashboard live.
+ */
 export const whoIsIn = query({
   args: {},
   handler: async (ctx) => {
@@ -163,18 +171,62 @@ export const whoIsIn = query({
           return {
             userId: u._id,
             nom: u.nom ?? u.email ?? "—",
-            poste: u.poste,
+            poste: u.poste ?? "",
             isIn: inside,
-            since: inside ? timeLabel(last!.at) : null,
-            duration: inside
-              ? formatMinutes(Math.round((now - last!.at) / 60_000))
-              : null,
+            sinceAt: inside ? last!.at : null,
+            sinceLabel: inside ? timeLabel(last!.at) : null,
+            // Last punch of any kind, so someone who left today still shows
+            // when they left rather than nothing at all.
+            lastAt: last?.at ?? null,
+            lastType: last?.type ?? null,
+            lastLabel: last ? timeLabel(last.at) : null,
+            lastIsToday: last ? dayKey(last.at) === dayKey(now) : false,
           };
         }),
     );
 
     return rows.sort(
-      (a, b) => Number(b.isIn) - Number(a.isIn) || a.nom.localeCompare(b.nom),
+      (a, b) =>
+        Number(b.isIn) - Number(a.isIn) ||
+        (b.lastAt ?? 0) - (a.lastAt ?? 0) ||
+        a.nom.localeCompare(b.nom),
+    );
+  },
+});
+
+/**
+ * The shop's punch feed, newest first — every entry and exit with who made it.
+ * Convex pushes this to the dashboard as it happens, so the admin sees an
+ * arrival the moment it is scanned.
+ */
+export const recentActivity = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    await requireAdmin(ctx);
+
+    const punches = await ctx.db
+      .query("badges")
+      .withIndex("by_at")
+      .order("desc")
+      .take(limit ?? 40);
+
+    const names = new Map<string, string>();
+    return await Promise.all(
+      punches.map(async (p) => {
+        if (!names.has(p.userId)) {
+          const u = await ctx.db.get(p.userId);
+          names.set(p.userId, u?.nom ?? u?.email ?? "—");
+        }
+        return {
+          _id: p._id,
+          userId: p.userId,
+          nom: names.get(p.userId)!,
+          type: p.type,
+          at: p.at,
+          time: timeLabel(p.at),
+          date: dayKey(p.at),
+        };
+      }),
     );
   },
 });
