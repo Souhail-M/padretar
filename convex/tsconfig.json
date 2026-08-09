@@ -11,8 +11,9 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    /* Convex exposes process.env to functions (ADMIN_EMAIL, CONVEX_SITE_URL). */
-    "types": ["node"],
+    /* "node" for process.env (ADMIN_EMAIL, CONVEX_SITE_URL) in functions;
+       "vite/client" for import.meta.glob, which convex-test needs in *.test.ts. */
+    "types": ["node", "vite/client"],
 
     /* These compiler options are required by Convex */
     "target": "ESNext",

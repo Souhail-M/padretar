@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { QRCodeSVG } from "qrcode.react";
 import { Link } from "react-router-dom";
@@ -22,11 +22,26 @@ export function Kiosk() {
   const kiosk = useQuery(api.kiosk.current);
   const rotate = useMutation(api.kiosk.rotate);
 
+  // The mutation is held in a ref so the interval can depend on nothing.
+  // useMutation returns a fresh function identity on every render, so keying
+  // the effect on it made each rotation re-run the effect and rotate again —
+  // a loop that changed the code faster than anyone could type it.
+  const rotateRef = useRef(rotate);
+  rotateRef.current = rotate;
+
+  // On mount the query still holds the *previous* code, which is usually
+  // already expired. Showing it would hand out a QR that gets refused, so
+  // nothing scannable is displayed until this screen's own rotation lands.
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    void rotate();
-    const timer = setInterval(() => void rotate(), ROTATE_MS);
+    const tick = () => void rotateRef.current().then(() => setReady(true));
+    tick();
+    const timer = setInterval(tick, ROTATE_MS);
     return () => clearInterval(timer);
-  }, [rotate]);
+  }, []);
+
+  const code = ready ? kiosk?.code : undefined;
 
   // Keep the shop screen awake — a sleeping kiosk is a kiosk nobody can punch at.
   useEffect(() => {
@@ -67,9 +82,9 @@ export function Kiosk() {
       <Wordmark className="text-xl text-neutral-400" />
 
       <div className="rounded-2xl bg-white p-6 sm:p-8">
-        {kiosk ? (
+        {code ? (
           <QRCodeSVG
-            value={kiosk.code}
+            value={code}
             size={320}
             level="M"
             className="h-[min(60vw,20rem)] w-[min(60vw,20rem)]"
@@ -84,7 +99,7 @@ export function Kiosk() {
           ou saisissez ce code
         </p>
         <p className="tnum mt-3 text-5xl font-light tracking-[0.35em] text-white sm:text-6xl">
-          {kiosk?.code ?? "······"}
+          {code ?? "······"}
         </p>
       </div>
     </div>
