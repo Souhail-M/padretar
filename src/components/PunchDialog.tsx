@@ -15,6 +15,36 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+/** Turn a getUserMedia failure into something an employee can act on. */
+function cameraMessage(error: unknown): string {
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    return (
+      "Le scan exige une connexion sécurisée (https). Sur cette adresse le " +
+      "navigateur ne donne aucun accès à la caméra. Saisissez le code."
+    );
+  }
+
+  const name = error instanceof Error ? error.name : String(error);
+  switch (name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return (
+        "Accès à la caméra refusé. Ouvrez les réglages du site dans le " +
+        "navigateur (l'icône à gauche de l'adresse) et autorisez la caméra."
+      );
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "Aucune caméra trouvée sur cet appareil. Saisissez le code.";
+    case "NotReadableError":
+      return (
+        "La caméra est déjà utilisée par une autre application. Fermez-la " +
+        "puis réessayez."
+      );
+    default:
+      return `Caméra indisponible (${name}). Saisissez le code.`;
+  }
+}
+
 /**
  * Reads the kiosk code and sends it. Two ways in, one mutation:
  * the camera, and typing the six characters printed under the QR.
@@ -31,10 +61,19 @@ export function PunchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const punch = useMutation(api.badges.punch);
-  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // A callback ref kept in state, not useRef: Radix mounts the dialog's
+  // content one commit after `open` flips, so an effect keyed on `open` alone
+  // runs while the <video> does not exist yet, bails out, and never retries —
+  // a permanently black square with no permission prompt. Holding the element
+  // in state makes the effect wait for the node instead.
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manual, setManual] = useState("");
   const [busy, setBusy] = useState(false);
+  // Bumped to re-run the camera effect when the employee retries.
+  const [attempt, setAttempt] = useState(0);
 
   // `submitting` guards against the scanner firing repeatedly on the same code
   // while the mutation is still in flight — otherwise one scan punches twice.
@@ -61,42 +100,53 @@ export function PunchDialog({
     }
   }
 
+  // Held in a ref so the camera effect depends on nothing that changes per
+  // render. `send` closes over useMutation's result, which is a fresh function
+  // identity on every render; depending on it would destroy and restart the
+  // scanner continuously — the same trap that made the kiosk code rotate in a
+  // loop.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+
   useEffect(() => {
-    if (!open || !videoRef.current) return;
+    // Waits for the element rather than bailing out; see setVideoEl above.
+    if (!open || !videoEl) return;
 
     setCameraError(null);
 
-    // Browsers only expose getUserMedia in a secure context (HTTPS, or
-    // localhost). Over plain HTTP on a LAN address navigator.mediaDevices is
-    // not merely refused — it is undefined, so no permission prompt ever
-    // appears and the camera looks broken. Say that plainly instead.
+    // Browsers expose getUserMedia only in a secure context (https, or
+    // localhost). Over plain http on a LAN address navigator.mediaDevices is
+    // undefined rather than refused, so no prompt ever appears.
     if (!window.isSecureContext || !navigator.mediaDevices) {
-      setCameraError(
-        "Le scan par caméra exige une connexion sécurisée (https). " +
-          "Sur cette adresse, le navigateur n'autorise pas la caméra. " +
-          "Saisissez le code affiché sur l'écran.",
-      );
+      setCameraError(cameraMessage(null));
       return;
     }
 
     const scanner = new QrScanner(
-      videoRef.current,
-      (result) => void send(result.data),
-      { highlightScanRegion: true, maxScansPerSecond: 4 },
+      videoEl,
+      (result) => void sendRef.current(result.data),
+      {
+        highlightScanRegion: true,
+        maxScansPerSecond: 4,
+        preferredCamera: "environment",
+      },
     );
 
-    scanner.start().catch(() => {
-      setCameraError(
-        "Caméra inaccessible. Vérifiez l'autorisation dans le navigateur, " +
-          "ou saisissez le code affiché sur l'écran.",
-      );
+    let cancelled = false;
+    scanner.start().catch((error: unknown) => {
+      if (cancelled) return;
+      // Surface the real reason: "camera unavailable" alone is impossible to
+      // act on, and hides a denied permission behind the same words as a
+      // missing device.
+      console.error("[padretar] camera start failed:", error);
+      setCameraError(cameraMessage(error));
     });
 
-    return () => scanner.destroy();
-    // `send` is stable enough for this dialog's lifetime; re-running on every
-    // render would restart the camera continuously.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    return () => {
+      cancelled = true;
+      scanner.destroy();
+    };
+  }, [open, videoEl, attempt]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,13 +158,29 @@ export function PunchDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="overflow-hidden rounded-md border bg-black">
-          {cameraError ? (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {cameraError}
-            </p>
-          ) : (
-            <video ref={videoRef} className="aspect-square w-full object-cover" />
+        {/* The video stays mounted whatever happens: unmounting it on error
+            takes the element away and makes retrying impossible. The message
+            sits on top instead. */}
+        <div className="relative aspect-square overflow-hidden rounded-md border bg-black">
+          <video
+            ref={setVideoEl}
+            playsInline
+            muted
+            className="size-full object-cover"
+          />
+
+          {cameraError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 px-4 text-center">
+              <p className="text-sm text-muted-foreground">{cameraError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAttempt((n) => n + 1)}
+              >
+                Réessayer
+              </Button>
+            </div>
           )}
         </div>
 
