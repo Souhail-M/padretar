@@ -13,11 +13,19 @@ services:
     pull_policy: always
     restart: unless-stopped
 
-    environment:
-      # Coolify replaces this with the domain set in its UI and routes that
-      # domain to port 80. TLS is terminated by Coolify's proxy — which is
-      # what makes the QR scanner work, since getUserMedia needs https.
-      - SERVICE_FQDN_WEB_80
+    # NOTE: no SERVICE_FQDN_WEB_80 here, on purpose.
+    #
+    # That magic variable does not read the configured domain — it *generates*
+    # one. Each time Coolify re-parses a changed compose file it mints a fresh
+    # random subdomain and overwrites the configured value, so the app silently
+    # moves and the previous address starts answering "503 no available
+    # server". Seen here: qlxgmo5nd… became xw6nc653… after a one-line compose
+    # edit that had nothing to do with domains.
+    #
+    # The domain is set explicitly on the resource in Coolify instead, which
+    # survives compose changes, and Coolify routes it to the port exposed
+    # below. TLS terminates at Coolify's proxy — required for the QR scanner,
+    # since getUserMedia only exists in a secure context.
 
     expose:
       - "80"
