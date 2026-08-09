@@ -78,7 +78,13 @@ push main → Actions (typecheck, tests, docker build) → GHCR → Coolify (pul
 ```
 
 Image : `ghcr.io/souhail-m/padretar` — tags `latest` et le SHA du commit, pour
-savoir exactement ce qui tourne.
+savoir exactement ce qui tourne. `linux/amd64`, ~26 Mo, port 80, health check
+intégré.
+
+Le paquet GHCR est **public** (il hérite de la visibilité du dépôt) et se tire
+sans identifiants — vérifié. Aucun *registry credential* à configurer dans
+Coolify. Si le dépôt passe en privé un jour, le paquet suivra et il faudra
+ajouter une clé de registre côté Coolify.
 
 *Côté Coolify :*
 
