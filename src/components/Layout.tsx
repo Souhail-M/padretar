@@ -14,7 +14,6 @@ const employeeNav = [
 const adminNav = [
   { to: "/admin", label: "Tableau de bord", end: true },
   { to: "/admin/employes", label: "Employés", end: false },
-  { to: "/admin/planning", label: "Planning", end: false },
   { to: "/admin/kiosque", label: "Kiosque", end: false },
 ];
 

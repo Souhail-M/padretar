@@ -11,7 +11,6 @@ import { Profil } from "@/pages/Profil";
 import { Dashboard } from "@/pages/admin/Dashboard";
 import { Employees } from "@/pages/admin/Employees";
 import { EmployeeDetail } from "@/pages/admin/EmployeeDetail";
-import { Planning } from "@/pages/admin/Planning";
 import { Kiosk } from "@/pages/admin/Kiosk";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -72,14 +71,6 @@ function Authed() {
           element={
             <AdminOnly isAdmin={isAdmin}>
               <EmployeeDetail />
-            </AdminOnly>
-          }
-        />
-        <Route
-          path="/admin/planning"
-          element={
-            <AdminOnly isAdmin={isAdmin}>
-              <Planning />
             </AdminOnly>
           }
         />

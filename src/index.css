@@ -40,6 +40,15 @@
   --border: #262626;
   --input: #2e2e2e;
   --ring: #fafafa;
+
+  /* Entry / exit are the one place colour is allowed. A timesheet is scanned,
+     not read, and "which of these is an arrival" has to be answerable without
+     reading a word. Everything else stays monochrome.
+     Muted rather than signal-bright: this sits on a near-black page all day. */
+  --enter: #5ec98a;
+  --enter-bg: #14301f;
+  --exit: #e08a7a;
+  --exit-bg: #331a16;
 }
 
 @theme inline {
@@ -67,6 +76,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-enter: var(--enter);
+  --color-enter-bg: var(--enter-bg);
+  --color-exit: var(--exit);
+  --color-exit-bg: var(--exit-bg);
 
   --font-serif: "Cormorant Garamond", Georgia, serif;
 }

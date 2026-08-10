@@ -41,14 +41,6 @@ export default defineSchema({
     .index("by_user_at", ["userId", "at"])
     .index("by_at", ["at"]),
 
-  shifts: defineTable({
-    userId: v.id("users"),
-    date: v.string(), // "YYYY-MM-DD", Europe/Paris — see lib/day.ts
-    start: v.string(), // "09:00"
-    end: v.string(), // "14:00"
-  })
-    .index("by_date", ["date"])
-    .index("by_user_date", ["userId", "date"]),
 
   // Exactly one row. Holds the code currently displayed on the shop kiosk.
   // A random short-lived code in the database *is* the signature — no JWT,

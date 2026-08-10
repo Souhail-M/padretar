@@ -18,15 +18,6 @@ export function longDate(date: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-/** "2026-08-09" -> "sam. 9" — for the tight planning grid header. */
-export function shortDate(date: string): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${date}T12:00:00Z`));
-}
-
 /** A timestamp -> "14:05", Paris time. */
 export function timeLabel(ts: number): string {
   return new Intl.DateTimeFormat("fr-FR", {

@@ -1,10 +1,10 @@
 # Padretar
 
-Pointage et planning pour la boutique **Dar as Saada**.
+Pointage pour la boutique **Dar as Saada**.
 
 Un employé pointe en scannant un QR affiché en boutique et consulte ses heures.
-Un responsable voit qui est présent, valide les nouveaux comptes et pose les
-créneaux de la semaine. Rien d'autre — et c'est délibéré.
+Un responsable voit qui est présent en temps réel, valide les nouveaux comptes
+et consulte le relevé de chaque employé. Rien d'autre — et c'est délibéré.
 
 ## Démarrer
 
@@ -92,8 +92,11 @@ ajouter une clé de registre côté Coolify.
 2. **Build Pack : `Docker Compose`** — le `docker-compose.yml` du dépôt n'a
    **pas** de clé `build:`, il pointe sur l'image GHCR. C'est ce qui déplace
    le build hors du serveur.
-3. **Domaine** : le renseigner dans Coolify. `SERVICE_FQDN_WEB_80` dans le
-   compose le câble sur le port 80, et Coolify obtient le certificat.
+3. **Domaine** : le renseigner dans Coolify, qui obtient le certificat. Le
+   compose n'utilise **pas** `SERVICE_FQDN_WEB_80` : cette variable magique ne
+   lit pas le domaine, elle en *génère* un, et Coolify en réattribue un
+   nouveau à chaque modification du compose — l'app change alors d'adresse et
+   l'ancienne renvoie « 503 no available server ».
 4. Health check : `/health` (déjà dans le compose et le Dockerfile).
 5. **Auto Deploy** : décocher. C'est Actions qui déclenche le redéploiement,
    une fois l'image poussée — sinon Coolify redéploie avant que la nouvelle
@@ -142,13 +145,12 @@ docker run -d -p 8080:80 padretar
 
 ```
 convex/
-  schema.ts      4 tables : users, badges, shifts, kiosk
+  schema.ts      3 tables : users, badges, kiosk
   auth.ts        Convex Auth (mot de passe) + bootstrap ADMIN_EMAIL
   lib/auth.ts    requireActive / requireAdmin — toute fonction commence par là
   lib/day.ts     fuseau Paris, semaines, durées
   badges.ts      punch, historique, présence
   kiosk.ts       code tournant
-  shifts.ts      créneaux
   employees.ts   validation et fiches
 src/
   pages/         écrans employé puis admin/
@@ -157,6 +159,6 @@ src/
 
 ## Volontairement absent
 
-Réinitialisation de mot de passe · congés · planning récurrent · export paie ·
+Réinitialisation de mot de passe · congés · planning · export paie ·
 notifications email · multi-boutique · correction manuelle des pointages ·
 thème clair. À rajouter seulement quand la boutique le demande vraiment.

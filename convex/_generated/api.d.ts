@@ -15,7 +15,6 @@ import type * as http from "../http.js";
 import type * as kiosk from "../kiosk.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_day from "../lib/day.js";
-import type * as shifts from "../shifts.js";
 
 import type {
   ApiFromModules,
@@ -31,7 +30,6 @@ declare const fullApi: ApiFromModules<{
   kiosk: typeof kiosk;
   "lib/auth": typeof lib_auth;
   "lib/day": typeof lib_day;
-  shifts: typeof shifts;
 }>;
 
 /**

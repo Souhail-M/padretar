@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMinutes, longDate } from "@/lib/format";
+import { formatMinutes } from "@/lib/format";
 
 export function EmployeeDetail() {
   const { id } = useParams();
@@ -24,7 +24,6 @@ export function EmployeeDetail() {
 
   const employee = useQuery(api.employees.get, { userId });
   const days = useQuery(api.badges.forEmployee, { userId });
-  const shifts = useQuery(api.shifts.forEmployee, { userId });
   const update = useMutation(api.employees.update);
 
   // Uncontrolled until first edit, so the fields fill in when the query lands.
@@ -115,25 +114,6 @@ export function EmployeeDetail() {
         <DayList days={days} />
       </section>
 
-      <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Créneaux
-        </h2>
-        {shifts === undefined ? null : shifts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun créneau.</p>
-        ) : (
-          <ul className="tnum divide-y border-y">
-            {shifts.map((shift) => (
-              <li key={shift._id} className="flex justify-between gap-4 py-3">
-                <span className="capitalize">{longDate(shift.date)}</span>
-                <span>
-                  {shift.start} — {shift.end}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
