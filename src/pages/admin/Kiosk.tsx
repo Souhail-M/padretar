@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { QRCodeSVG } from "qrcode.react";
-import { Link } from "react-router-dom";
-import { X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Lock } from "lucide-react";
 
 import { api } from "../../../convex/_generated/api";
 import { Wordmark } from "@/components/Wordmark";
+import { KioskUnlockDialog } from "@/components/KioskUnlockDialog";
+import { useKioskLock } from "@/lib/useKioskLock";
 
 /** Matches the 60s TTL in convex/kiosk.ts, halved: a code is always replaced
  *  well before it can expire under someone's camera. */
@@ -21,6 +23,17 @@ const ROTATE_MS = 30_000;
 export function Kiosk() {
   const kiosk = useQuery(api.kiosk.current);
   const rotate = useMutation(api.kiosk.rotate);
+  const navigate = useNavigate();
+  const { lock, unlock } = useKioskLock();
+  const [asking, setAsking] = useState(false);
+
+  // Opening the kiosk locks the app to it. The screen sits unattended in the
+  // shop under an admin session, so leaving must cost a password — and the
+  // lock has to survive the back button and the address bar, not just the
+  // close control.
+  useEffect(() => {
+    lock();
+  }, [lock]);
 
   // The mutation is held in a ref so the interval can depend on nothing.
   // useMutation returns a fresh function identity on every render, so keying
@@ -45,12 +58,12 @@ export function Kiosk() {
 
   // Keep the shop screen awake — a sleeping kiosk is a kiosk nobody can punch at.
   useEffect(() => {
-    let lock: WakeLockSentinel | null = null;
+    let sentinel: WakeLockSentinel | null = null;
     const request = () =>
       navigator.wakeLock
         ?.request("screen")
-        .then((sentinel) => {
-          lock = sentinel;
+        .then((granted) => {
+          sentinel = granted;
         })
         .catch(() => {
           // Unsupported or denied; the screen's own timeout takes over.
@@ -65,19 +78,29 @@ export function Kiosk() {
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
-      void lock?.release();
+      void sentinel?.release();
     };
   }, []);
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center gap-10 bg-black px-6 py-10">
-      <Link
-        to="/admin"
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
         aria-label="Quitter le kiosque"
         className="absolute right-4 top-4 rounded-md p-2 text-neutral-700 transition-colors hover:text-neutral-300"
       >
-        <X className="size-5" />
-      </Link>
+        <Lock className="size-5" />
+      </button>
+
+      <KioskUnlockDialog
+        open={asking}
+        onOpenChange={setAsking}
+        onUnlocked={() => {
+          unlock();
+          navigate("/admin", { replace: true });
+        }}
+      />
 
       <Wordmark className="text-xl text-neutral-400" />
 

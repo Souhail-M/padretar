@@ -13,6 +13,7 @@ import { Employees } from "@/pages/admin/Employees";
 import { EmployeeDetail } from "@/pages/admin/EmployeeDetail";
 import { Kiosk } from "@/pages/admin/Kiosk";
 import { Toaster } from "@/components/ui/sonner";
+import { useKioskLock } from "@/lib/useKioskLock";
 
 function Splash() {
   return (
@@ -28,12 +29,24 @@ function AdminOnly({ isAdmin, children }: { isAdmin: boolean; children: React.Re
 
 function Authed() {
   const me = useQuery(api.auth.me);
+  const { locked, unlock } = useKioskLock();
 
   if (me === undefined) return <Splash />;
   if (me === null) return <Splash />;
   if (me.status !== "active") return <Pending status={me.status} />;
 
   const isAdmin = me.role === "admin";
+
+  // While the kiosk is locked nothing else renders, whatever the URL says.
+  // Guarding only the kiosk's own close button would achieve nothing: the
+  // back button and the address bar both walk straight past it, and the
+  // screen is sitting unattended in the shop under an admin session.
+  if (locked) {
+    if (isAdmin) return <Kiosk />;
+    // A non-admin can never be behind this lock; clear the stale flag rather
+    // than trapping them on a screen they have no business seeing.
+    unlock();
+  }
 
   // The kiosk is deliberately outside the layout: it is a full-screen display,
   // not a page someone navigates around from.
