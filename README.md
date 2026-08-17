@@ -46,6 +46,32 @@ Toutes les frontières de journée passent par `convex/lib/day.ts` (fuseau
 Europe/Paris, changements d'heure compris). Convex tourne en UTC : ne pas
 calculer de date ailleurs.
 
+La fiche d'un employé affiche ses totaux **par semaine** (du lundi) et **par
+mois**, calculés côté serveur à partir des mêmes journées que la liste en
+dessous — un total ne peut donc pas contredire les pointages affichés. Une
+semaine contenant une journée sans sortie est marquée `*` : elle est
+sous-évaluée, et le dire vaut mieux qu'un total de paie qui a perdu une
+vacation en silence.
+
+## Mot de passe oublié
+
+Aucun email n'est envoyé. Un lien de réinitialisation demanderait un domaine
+d'envoi vérifié, une clé d'API et un `SITE_URL` correct — et serait plus lent
+que la réalité de la boutique, où l'employé et le responsable sont dans la
+même pièce.
+
+- **Un employé** : le responsable ouvre sa fiche, saisit un nouveau mot de
+  passe (8 caractères minimum) et le lui donne de vive voix. Les sessions
+  ouvertes de cet employé sont fermées.
+- **Le responsable lui-même** : personne au-dessus de lui, donc ça se passe en
+  ligne de commande. La fonction est `internalAction` — injoignable depuis le
+  navigateur, seulement depuis le CLI et le tableau de bord Convex, qui
+  exigent déjà la clé d'administration du déploiement.
+
+```bash
+npx convex run password:resetByEmail '{"email":"vous@example.com","password":"…"}' --prod
+```
+
 ## Déploiement
 
 Le back-end est Convex (hébergé) : il n'y a ni serveur d'API ni base de
@@ -149,9 +175,10 @@ convex/
   auth.ts        Convex Auth (mot de passe) + bootstrap ADMIN_EMAIL
   lib/auth.ts    requireActive / requireAdmin — toute fonction commence par là
   lib/day.ts     fuseau Paris, semaines, durées
-  badges.ts      punch, historique, présence
+  badges.ts      punch, historique, présence, totaux semaine/mois
   kiosk.ts       code tournant
   employees.ts   validation et fiches
+  password.ts    réinitialisation (par un admin, ou par le CLI)
 src/
   pages/         écrans employé puis admin/
   components/    SignIn, Layout, PunchDialog, DayList
@@ -159,6 +186,8 @@ src/
 
 ## Volontairement absent
 
-Réinitialisation de mot de passe · congés · planning · export paie ·
+Réinitialisation en autonomie par email · congés · planning · export paie ·
 notifications email · multi-boutique · correction manuelle des pointages ·
-thème clair. À rajouter seulement quand la boutique le demande vraiment.
+récapitulatif mensuel de toute l'équipe sur un seul écran (les totaux se
+lisent employé par employé) · thème clair. À rajouter seulement quand la
+boutique le demande vraiment.

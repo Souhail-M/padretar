@@ -130,6 +130,99 @@ describe("punch", () => {
   });
 });
 
+describe("weekly and monthly totals", () => {
+  /** A shop with an admin reading the timesheet of one employee. */
+  async function shopWithHistory(punches: { at: string; type: "in" | "out" }[]) {
+    const t = convexTest(schema, modules);
+
+    const { adminId, userId } = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "employe@example.com",
+        role: "employee",
+        status: "active",
+      });
+      for (const p of punches) {
+        await ctx.db.insert("badges", {
+          userId,
+          at: Date.parse(p.at),
+          type: p.type,
+        });
+      }
+      return {
+        userId,
+        adminId: await ctx.db.insert("users", {
+          email: "patron@example.com",
+          role: "admin",
+          status: "active",
+        }),
+      };
+    });
+
+    return {
+      t,
+      userId,
+      admin: t.withIdentity({ subject: `${adminId}|session` }),
+      employee: t.withIdentity({ subject: `${userId}|session` }),
+    };
+  }
+
+  test("groups days into Monday weeks and calendar months", async () => {
+    // Paris is UTC+2 in August, so the offsets are written out explicitly.
+    const { admin, userId } = await shopWithHistory([
+      // Thursday 30 July — week of Monday 27 July, month of July.
+      { at: "2026-07-30T09:00:00+02:00", type: "in" },
+      { at: "2026-07-30T12:00:00+02:00", type: "out" }, // 3h
+      // Monday 3 August, then Wednesday 5 — same week, and August.
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T17:00:00+02:00", type: "out" }, // 8h
+      { at: "2026-08-05T09:00:00+02:00", type: "in" },
+      { at: "2026-08-05T11:30:00+02:00", type: "out" }, // 2h30
+    ]);
+
+    const { weeks, months } = await admin.query(api.badges.forEmployee, { userId });
+
+    expect(weeks).toEqual([
+      { key: "2026-08-03", minutes: 630, incomplete: false },
+      { key: "2026-07-27", minutes: 180, incomplete: false },
+    ]);
+    expect(months).toEqual([
+      { key: "2026-08", minutes: 630, incomplete: false },
+      { key: "2026-07", minutes: 180, incomplete: false },
+    ]);
+  });
+
+  test("a day with no exit marks its week and month as under-counted", async () => {
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T17:00:00+02:00", type: "out" }, // 8h
+      { at: "2026-08-06T09:00:00+02:00", type: "in" }, // never clocked out
+    ]);
+
+    const { weeks, months } = await admin.query(api.badges.forEmployee, { userId });
+
+    // The missing exit adds no invented minutes, and says so.
+    expect(weeks).toEqual([{ key: "2026-08-03", minutes: 480, incomplete: true }]);
+    expect(months).toEqual([{ key: "2026-08", minutes: 480, incomplete: true }]);
+  });
+
+  test("an employee cannot read another employee's timesheet", async () => {
+    const { employee, userId } = await shopWithHistory([]);
+    await expect(
+      employee.query(api.badges.forEmployee, { userId }),
+    ).rejects.toThrow(/administrateurs/);
+  });
+
+  test("an employee cannot reset a password", async () => {
+    const { employee, userId } = await shopWithHistory([]);
+    await expect(
+      employee.action(api.password.resetForEmployee, {
+        userId,
+        password: "motdepasse",
+      }),
+    ).rejects.toThrow(/administrateurs/);
+  });
+});
+
 describe("day helpers", () => {
   test("dayKey follows Paris, not UTC, across midnight", () => {
     // 2026-08-09 22:30 UTC is already the 10th in Paris (summer time, UTC+2).

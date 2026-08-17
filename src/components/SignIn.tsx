@@ -12,6 +12,7 @@ export function SignIn() {
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [forgot, setForgot] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,12 +85,32 @@ export function SignIn() {
           onClick={() => {
             setFlow(flow === "signIn" ? "signUp" : "signIn");
             setError(null);
+            setForgot(false);
           }}
         >
           {flow === "signIn"
             ? "Pas encore de compte ? En créer un"
             : "J'ai déjà un compte"}
         </button>
+
+        {/* No reset link is mailed: there is no email service here, and the
+            employee and the responsable are in the same shop. Saying so beats
+            a link that never arrives. */}
+        {flow === "signIn" &&
+          (forgot ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Demandez à votre responsable : il vous en donne un nouveau depuis
+              votre fiche, dans l'espace admin.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+              onClick={() => setForgot(true)}
+            >
+              Mot de passe oublié ?
+            </button>
+          ))}
       </form>
     </div>
   );

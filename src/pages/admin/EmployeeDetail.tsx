@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -16,20 +16,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMinutes } from "@/lib/format";
+import { formatMinutes, monthLabel, weekLabel } from "@/lib/format";
+
+/** How many periods are worth showing; further back is history, not payroll. */
+const PERIODS_SHOWN = 8;
 
 export function EmployeeDetail() {
   const { id } = useParams();
   const userId = id as Id<"users">;
 
   const employee = useQuery(api.employees.get, { userId });
-  const days = useQuery(api.badges.forEmployee, { userId });
+  const timesheet = useQuery(api.badges.forEmployee, { userId });
   const update = useMutation(api.employees.update);
+  const resetPassword = useAction(api.password.resetForEmployee);
 
   // Uncontrolled until first edit, so the fields fill in when the query lands.
   const [draft, setDraft] = useState<{ nom: string; poste: string } | null>(null);
   const nom = draft?.nom ?? employee?.nom ?? "";
   const poste = draft?.poste ?? employee?.poste ?? "";
+
+  const [scale, setScale] = useState<"week" | "month">("week");
+  const periods = (scale === "week" ? timesheet?.weeks : timesheet?.months) ?? [];
+  const shown = periods.slice(0, PERIODS_SHOWN);
+
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   async function save() {
     try {
@@ -38,6 +49,21 @@ export function EmployeeDetail() {
       toast.success("Fiche enregistrée");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+    }
+  }
+
+  async function resetPasswordNow() {
+    setResetting(true);
+    try {
+      await resetPassword({ userId, password: newPassword });
+      setNewPassword("");
+      toast.success("Mot de passe changé. L'employé est déconnecté partout.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Réinitialisation impossible",
+      );
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -100,18 +126,98 @@ export function EmployeeDetail() {
         </Button>
       </section>
 
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Pointages
-          </h2>
-          {days && days.length > 0 && (
-            <p className="tnum text-sm text-muted-foreground">
-              {formatMinutes(days.reduce((sum, day) => sum + day.minutes, 0))} au total
-            </p>
-          )}
+      <section className="space-y-4">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Mot de passe oublié
+        </h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[14rem] flex-1 space-y-2">
+            <Label htmlFor="new-password">Nouveau mot de passe</Label>
+            {/* Shown in clear on purpose: this one is read out loud to the
+                employee standing there, not typed in secret. */}
+            <Input
+              id="new-password"
+              type="text"
+              autoComplete="off"
+              value={newPassword}
+              placeholder="8 caractères minimum"
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            disabled={newPassword.trim().length < 8 || resetting}
+            onClick={() => void resetPasswordNow()}
+          >
+            Réinitialiser
+          </Button>
         </div>
-        <DayList days={days} />
+        <p className="text-sm text-muted-foreground">
+          Aucun email n'est envoyé : vous donnez le nouveau mot de passe à
+          l'employé, qui le change ensuite s'il le souhaite. Ses sessions
+          ouvertes sont fermées.
+        </p>
+      </section>
+
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Totaux
+          </h2>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant={scale === "week" ? "default" : "ghost"}
+              onClick={() => setScale("week")}
+            >
+              Semaine
+            </Button>
+            <Button
+              size="sm"
+              variant={scale === "month" ? "default" : "ghost"}
+              onClick={() => setScale("month")}
+            >
+              Mois
+            </Button>
+          </div>
+        </div>
+
+        {timesheet === undefined ? null : shown.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun pointage.</p>
+        ) : (
+          <>
+            <ul className="divide-y border-y">
+              {shown.map((period) => (
+                <li
+                  key={period.key}
+                  className="flex items-baseline justify-between gap-4 py-2"
+                >
+                  <span className="text-sm capitalize text-muted-foreground">
+                    {scale === "week"
+                      ? weekLabel(period.key)
+                      : monthLabel(period.key)}
+                  </span>
+                  <span className="tnum shrink-0 text-sm">
+                    {formatMinutes(period.minutes)}
+                    {period.incomplete && <span className="text-exit"> *</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {shown.some((period) => period.incomplete) && (
+              <p className="text-xs text-muted-foreground">
+                * contient une journée sans sortie : le total est sous-évalué.
+              </p>
+            )}
+          </>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Pointages
+        </h2>
+        <DayList days={timesheet?.days} />
       </section>
 
     </div>

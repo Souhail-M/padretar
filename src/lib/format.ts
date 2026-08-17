@@ -18,6 +18,25 @@ export function longDate(date: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
+/** A Monday "2026-08-03" -> "semaine du 3 août" */
+export function weekLabel(monday: string): string {
+  const day = new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(`${monday}T12:00:00Z`));
+  return `semaine du ${day}`;
+}
+
+/** "2026-08" -> "août 2026" */
+export function monthLabel(month: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${month}-01T12:00:00Z`));
+}
+
 /** A timestamp -> "14:05", Paris time. */
 export function timeLabel(ts: number): string {
   return new Intl.DateTimeFormat("fr-FR", {

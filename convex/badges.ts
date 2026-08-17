@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { requireActive, requireAdmin } from "./lib/auth";
-import { dayKey, timeLabel } from "./lib/day";
+import { dayKey, mondayOf, timeLabel } from "./lib/day";
 
 /** How far back the history screens look. A shop punches ~4x/day, so this is
  *  roughly a year for one person. */
@@ -136,6 +136,38 @@ function groupByDay(punches: Doc<"badges">[]): Day[] {
     });
 }
 
+/** A week or a month of work, keyed by its first day ("2026-08-03", "2026-08"). */
+export type Period = { key: string; minutes: number; incomplete: boolean };
+
+/**
+ * Roll days up into weeks (Monday-first) and calendar months.
+ *
+ * Both scales are derived from the same day list, so a total can never
+ * disagree with the days shown under it. Week boundaries come from
+ * lib/day.ts like every other date in the app — a "week" computed in the
+ * browser would drift from the Paris day keys the punches are grouped by.
+ *
+ * `incomplete` is carried up: a period holding a day with a missing exit is
+ * under-counted, and saying so is the only honest option — the alternative is
+ * a payroll total that quietly lost a shift.
+ */
+function summarize(days: Day[]): { weeks: Period[]; months: Period[] } {
+  const roll = (keyOf: (date: string) => string): Period[] => {
+    const totals = new Map<string, Period>();
+    for (const day of days) {
+      const key = keyOf(day.date);
+      const period = totals.get(key) ?? { key, minutes: 0, incomplete: false };
+      period.minutes += day.minutes;
+      period.incomplete ||= day.incomplete;
+      totals.set(key, period);
+    }
+    // Newest first, like the day list above it.
+    return [...totals.values()].sort((a, b) => b.key.localeCompare(a.key));
+  };
+
+  return { weeks: roll(mondayOf), months: roll((date) => date.slice(0, 7)) };
+}
+
 /** The signed-in employee's own punch history, newest day first. */
 export const mine = query({
   args: {},
@@ -150,7 +182,10 @@ export const mine = query({
   },
 });
 
-/** One employee's punch history. Admin only. */
+/**
+ * One employee's punch history plus their weekly and monthly totals. Admin
+ * only — this is the screen hours are read off for pay.
+ */
 export const forEmployee = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
@@ -160,7 +195,8 @@ export const forEmployee = query({
       .withIndex("by_user_at", (q) => q.eq("userId", userId))
       .order("desc")
       .take(HISTORY_LIMIT);
-    return groupByDay(punches);
+    const days = groupByDay(punches);
+    return { days, ...summarize(days) };
   },
 });
 
