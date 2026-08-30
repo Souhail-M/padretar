@@ -49,4 +49,14 @@ export default defineSchema({
     code: v.string(),
     expiresAt: v.number(),
   }),
+
+  // Zero or one row. The dedicated password that frees the kiosk screen,
+  // stored only as a salted hash — the shop keeps using it daily, and it must
+  // never be the admin account's login password, which guards far more.
+  // No row means "fall back to the login password", which is how every kiosk
+  // starts before the responsable picks something short enough to type.
+  kioskExit: defineTable({
+    salt: v.string(),
+    hash: v.string(),
+  }),
 });

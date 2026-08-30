@@ -13,6 +13,7 @@ import type * as badges from "../badges.js";
 import type * as employees from "../employees.js";
 import type * as http from "../http.js";
 import type * as kiosk from "../kiosk.js";
+import type * as kioskExit from "../kioskExit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_day from "../lib/day.js";
 import type * as password from "../password.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   employees: typeof employees;
   http: typeof http;
   kiosk: typeof kiosk;
+  kioskExit: typeof kioskExit;
   "lib/auth": typeof lib_auth;
   "lib/day": typeof lib_day;
   password: typeof password;

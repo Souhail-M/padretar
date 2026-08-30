@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { PunchRow } from "@/components/PunchRow";
+import { KioskPasswordCard } from "@/components/KioskPasswordCard";
 import { cn } from "@/lib/utils";
 import { formatMinutes } from "@/lib/format";
 import { minutesSince, useNow } from "@/lib/useNow";
@@ -148,9 +149,15 @@ export function Dashboard() {
         )}
       </section>
 
-      <Button asChild variant="outline" className="w-full">
-        <Link to="/admin/kiosque">Ouvrir l'écran kiosque</Link>
-      </Button>
+      <section className="space-y-3">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Kiosque
+        </h2>
+        <KioskPasswordCard />
+        <Button asChild variant="outline" className="w-full">
+          <Link to="/admin/kiosque">Ouvrir l'écran kiosque</Link>
+        </Button>
+      </section>
     </div>
   );
 }

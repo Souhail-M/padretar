@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 
@@ -16,13 +16,18 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Asks for the admin password before the kiosk will let go of the screen.
+ * Asks for a password before the kiosk will let go of the screen.
  *
- * The password is checked by signing in again with the account already in
- * session: Convex Auth owns the hashing, so re-running its own sign-in is the
- * only way to verify a password without reimplementing that — and getting
- * password verification subtly wrong is exactly the kind of thing not to
- * hand-roll. A wrong password throws and the kiosk stays put.
+ * Two secrets can open it, in order of preference:
+ *
+ * - the dedicated kiosk password (kioskExit.ts), when the responsable has set
+ *   one — checked by comparing its salted hash server-side;
+ * - otherwise the account password, as before: Convex Auth owns the hashing,
+ *   so re-running its own sign-in is the only way to verify that without
+ *   reimplementing it — and getting password verification subtly wrong is
+ *   exactly the kind of thing not to hand-roll.
+ *
+ * A wrong secret throws and the kiosk stays put.
  */
 export function KioskUnlockDialog({
   open,
@@ -34,23 +39,38 @@ export function KioskUnlockDialog({
   onUnlocked: () => void;
 }) {
   const me = useQuery(api.auth.me);
+  // Which secret is being asked for. Undefined while it loads; null means no
+  // dedicated password exists and the login password is the gate.
+  const exitState = useQuery(api.kioskExit.state);
+  const dedicated = exitState?.configured === true;
+
   const { signIn } = useAuthActions();
+  const verifyExit = useMutation(api.kioskExit.verify);
+
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!me?.email) return;
+    if (!password) return;
 
     setBusy(true);
     setError(null);
     try {
-      const form = new FormData();
-      form.set("email", me.email);
-      form.set("password", password);
-      form.set("flow", "signIn");
-      await signIn("password", form);
+      if (dedicated) {
+        const ok = await verifyExit({ password });
+        if (!ok) throw new Error("wrong");
+      } else {
+        // Fallback path: the login password, verified by signing in again
+        // with the account already in session.
+        if (!me?.email) throw new Error("no-session");
+        const form = new FormData();
+        form.set("email", me.email);
+        form.set("password", password);
+        form.set("flow", "signIn");
+        await signIn("password", form);
+      }
 
       setPassword("");
       onOpenChange(false);
@@ -78,20 +98,25 @@ export function KioskUnlockDialog({
         <DialogHeader>
           <DialogTitle>Quitter le kiosque</DialogTitle>
           <DialogDescription>
-            Cet écran est ouvert en boutique. Le mot de passe du compte
-            responsable est demandé pour en sortir.
+            {exitState === undefined
+              ? "Cet écran est ouvert en boutique. Un mot de passe est demandé pour en sortir."
+              : dedicated
+                ? "Cet écran est ouvert en boutique. Saisissez le mot de passe de sortie du kiosque."
+                : "Cet écran est ouvert en boutique. Le mot de passe du compte responsable est demandé pour en sortir."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={(e) => void submit(e)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="kiosk-password">
-              Mot de passe {me?.email ? `de ${me.email}` : ""}
+              {dedicated
+                ? "Mot de passe de sortie"
+                : `Mot de passe ${me?.email ? `de ${me.email}` : ""}`}
             </Label>
             <Input
               id="kiosk-password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={dedicated ? "off" : "current-password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoFocus
@@ -101,7 +126,11 @@ export function KioskUnlockDialog({
 
           {error && <p className="text-sm text-exit">{error}</p>}
 
-          <Button type="submit" className="w-full" disabled={busy || !password}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={busy || !password || exitState === undefined}
+          >
             {busy && <Loader2 className="animate-spin" />}
             Déverrouiller
           </Button>
