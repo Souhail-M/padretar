@@ -205,6 +205,40 @@ describe("weekly and monthly totals", () => {
     expect(months).toEqual([{ key: "2026-08", minutes: 480, incomplete: true }]);
   });
 
+  test("a week is counted whole even when it straddles two months", async () => {
+    // Monday 31 August 2026 opens a week that ends in September.
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-31T09:00:00+02:00", type: "in" },
+      { at: "2026-08-31T17:00:00+02:00", type: "out" }, // 8h, August
+      { at: "2026-09-01T09:00:00+02:00", type: "in" },
+      { at: "2026-09-01T13:00:00+02:00", type: "out" }, // 4h, September
+    ]);
+
+    const { weeks, months } = await admin.query(api.badges.forEmployee, { userId });
+
+    expect(weeks).toEqual([{ key: "2026-08-31", minutes: 720, incomplete: false }]);
+    expect(months).toEqual([
+      { key: "2026-09", minutes: 240, incomplete: false },
+      { key: "2026-08", minutes: 480, incomplete: false },
+    ]);
+  });
+
+  test("two shifts in one day add up, and the day totals match the week", async () => {
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T12:00:00+02:00", type: "out" }, // 3h
+      { at: "2026-08-03T14:00:00+02:00", type: "in" },
+      { at: "2026-08-03T18:30:00+02:00", type: "out" }, // 4h30
+    ]);
+
+    const { days, weeks } = await admin.query(api.badges.forEmployee, { userId });
+
+    expect(days).toHaveLength(1);
+    expect(days[0].minutes).toBe(450);
+    expect(days[0].punches).toHaveLength(4);
+    expect(weeks[0].minutes).toBe(450);
+  });
+
   test("an employee cannot read another employee's timesheet", async () => {
     const { employee, userId } = await shopWithHistory([]);
     await expect(
