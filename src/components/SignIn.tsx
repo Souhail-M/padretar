@@ -3,6 +3,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 
 import { Wordmark } from "./Wordmark";
+import { ForgotPassword } from "./ForgotPassword";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,18 @@ export function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [forgot, setForgot] = useState(false);
+
+  if (forgot) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
+        <Wordmark className="mb-2 text-2xl" />
+        <p className="mb-10 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Padretar
+        </p>
+        <ForgotPassword onDone={() => setForgot(false)} />
+      </div>
+    );
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,24 +106,15 @@ export function SignIn() {
             : "J'ai déjà un compte"}
         </button>
 
-        {/* No reset link is mailed: there is no email service here, and the
-            employee and the responsable are in the same shop. Saying so beats
-            a link that never arrives. */}
-        {flow === "signIn" &&
-          (forgot ? (
-            <p className="text-center text-sm text-muted-foreground">
-              Demandez à votre responsable : il vous en donne un nouveau depuis
-              votre fiche, dans l'espace admin.
-            </p>
-          ) : (
-            <button
-              type="button"
-              className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-              onClick={() => setForgot(true)}
-            >
-              Mot de passe oublié ?
-            </button>
-          ))}
+        {flow === "signIn" && (
+          <button
+            type="button"
+            className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+            onClick={() => setForgot(true)}
+          >
+            Mot de passe oublié ?
+          </button>
+        )}
       </form>
     </div>
   );

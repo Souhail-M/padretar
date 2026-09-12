@@ -14,14 +14,22 @@ npm run dev          # Convex + Vite ensemble
 ```
 
 Au premier lancement, `npx convex dev` configure le déploiement et écrit
-`.env.local`. Ensuite, désigner le premier administrateur :
+`.env.local`. La première personne qui s'inscrit sur une instance neuve
+devient admin actif automatiquement — rien à configurer. Pour forcer une
+adresse précise à la place (ou en ajouter une deuxième), c'est optionnel :
 
 ```bash
-npx convex env set ADMIN_EMAIL vous@example.com
+npx convex env set ADMIN_EMAIL "vous@example.com,autre@example.com"
 ```
 
-La personne qui s'inscrit avec cette adresse devient admin actif immédiatement.
 Tout le monde d'autre arrive en `pending` et attend une validation.
+
+Pour que le responsable puisse récupérer son mot de passe seul (voir
+« Mot de passe oublié » plus bas), une clé Resend :
+
+```bash
+npx convex env set AUTH_RESEND_KEY re_xxxxxxxx
+```
 
 | Commande | Rôle |
 |---|---|
@@ -55,18 +63,18 @@ vacation en silence.
 
 ## Mot de passe oublié
 
-Aucun email n'est envoyé. Un lien de réinitialisation demanderait un domaine
-d'envoi vérifié, une clé d'API et un `SITE_URL` correct — et serait plus lent
-que la réalité de la boutique, où l'employé et le responsable sont dans la
-même pièce.
+- **Un employé** : le plus rapide reste le responsable — il ouvre sa fiche,
+  saisit un nouveau mot de passe (8 caractères minimum) et le lui donne de
+  vive voix. Les sessions ouvertes de cet employé sont fermées. L'employé
+  peut aussi utiliser le lien « Mot de passe oublié ? » ci-dessous s'il
+  préfère ne pas déranger le responsable.
+- **Le responsable lui-même** : personne au-dessus de lui, donc c'est un code
+  reçu par email (« Mot de passe oublié ? » sur l'écran de connexion) —
+  autonome, aucune intervention du développeur nécessaire. Nécessite
+  `AUTH_RESEND_KEY` (voir tableau des variables plus bas).
 
-- **Un employé** : le responsable ouvre sa fiche, saisit un nouveau mot de
-  passe (8 caractères minimum) et le lui donne de vive voix. Les sessions
-  ouvertes de cet employé sont fermées.
-- **Le responsable lui-même** : personne au-dessus de lui, donc ça se passe en
-  ligne de commande. La fonction est `internalAction` — injoignable depuis le
-  navigateur, seulement depuis le CLI et le tableau de bord Convex, qui
-  exigent déjà la clé d'administration du déploiement.
+Filet de sécurité si Resend est en panne ou mal configuré : la fonction CLI
+`resetByEmail`, injoignable depuis le navigateur.
 
 ```bash
 npx convex run password:resetByEmail '{"email":"vous@example.com","password":"…"}' --prod
@@ -85,8 +93,9 @@ statiques.
 | dev | `https://groovy-hare-598.eu-west-1.convex.cloud` |
 | **prod** | `https://hardy-dragon-575.eu-west-1.convex.cloud` |
 
-Les deux ont leurs propres `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL` et
-`ADMIN_EMAIL` — les clés d'un déploiement ne valent jamais pour l'autre.
+Les deux ont leurs propres `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`,
+`ADMIN_EMAIL` (optionnel) et `AUTH_RESEND_KEY` — les clés d'un déploiement ne
+valent jamais pour l'autre.
 
 ```bash
 npx convex deploy            # pousse les fonctions en production
@@ -178,7 +187,8 @@ convex/
   badges.ts      punch, historique, présence, totaux semaine/mois
   kiosk.ts       code tournant
   employees.ts   validation et fiches
-  password.ts    réinitialisation (par un admin, ou par le CLI)
+  password.ts    réinitialisation (par un admin en personne, ou par email)
+  ResendOTPPasswordReset.ts  code de réinitialisation envoyé par email
 src/
   pages/         écrans employé puis admin/
   components/    SignIn, Layout, PunchDialog, DayList
@@ -186,7 +196,7 @@ src/
 
 ## Volontairement absent
 
-Réinitialisation en autonomie par email · congés · planning · export paie ·
+Congés · planning · export paie ·
 notifications email · multi-boutique · correction manuelle des pointages ·
 récapitulatif mensuel de toute l'équipe sur un seul écran (les totaux se
 lisent employé par employé) · thème clair. À rajouter seulement quand la

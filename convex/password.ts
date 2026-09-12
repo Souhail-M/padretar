@@ -9,16 +9,17 @@ import type { DataModel } from "./_generated/dataModel";
 import { requireAdmin } from "./lib/auth";
 
 /**
- * Forgotten passwords, without an email service.
+ * Forgotten passwords.
  *
- * The usual flow — a "reset link" mailed to the employee — needs a verified
- * sending domain, an API key and a working SITE_URL, none of which this shop
- * has. It would also be the slowest path for the people involved: the
- * employee and the responsable stand in the same room. So the responsable
- * resets it from the employee's fiche and says the new password out loud.
+ * An employee and the responsable usually stand in the same room, so the
+ * in-person path stays the fast default: the responsable resets it from the
+ * employee's fiche and says the new password out loud.
  *
- * The responsable's own password is the one case that has nobody above it,
- * and that one is reset from the command line — see `resetByEmail`.
+ * The responsable's own password is the one case that has nobody above it —
+ * that one now goes through the emailed-code flow instead (`reset` on the
+ * Password provider in convex/auth.ts, via convex/ResendOTPPasswordReset.ts).
+ * `resetByEmail` below stays only as a break-glass fallback for when Resend
+ * itself is down or misconfigured.
  */
 
 /** The rule the Password provider applies on sign-up; a reset must not be a way around it. */
@@ -70,7 +71,9 @@ export const resetForEmployee = action({
 });
 
 /**
- * The way back in when the forgotten password is the admin's own.
+ * Break-glass fallback for an admin locked out of their own account, for
+ * when the emailed-code reset can't be used (Resend down, AUTH_RESEND_KEY
+ * missing, etc). Normal recovery is self-service — see the module docstring.
  *
  *   npx convex run password:resetByEmail '{"email":"vous@example.com","password":"…"}'
  *   npx convex run password:resetByEmail '{...}' --prod    # production

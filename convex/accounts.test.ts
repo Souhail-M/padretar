@@ -71,8 +71,9 @@ async function shopWithAdmin() {
 
 describe("account creation", () => {
   test("a new sign-up waits for approval and can do nothing yet", async () => {
-    process.env.ADMIN_EMAIL = "patron@example.com";
-    const t = convexTest(schema, modules);
+    // The employee must not be the first-ever account in this instance, or
+    // the bootstrap rule below would promote them instead of the admin.
+    const { t, adminId } = await shopWithAdmin();
 
     await signUp(t, {
       email: "employe@example.com",
@@ -80,7 +81,7 @@ describe("account creation", () => {
       nom: "Employé",
     });
 
-    const [user] = await users(t);
+    const user = (await users(t)).find((u) => u._id !== adminId)!;
     expect(user).toMatchObject({
       email: "employe@example.com",
       nom: "Employé",
@@ -96,7 +97,6 @@ describe("account creation", () => {
   });
 
   test("the email is normalised and the name trimmed", async () => {
-    process.env.ADMIN_EMAIL = "patron@example.com";
     const t = convexTest(schema, modules);
 
     await signUp(t, {
@@ -118,6 +118,27 @@ describe("account creation", () => {
 
     const [user] = await users(t);
     expect(user).toMatchObject({ role: "admin", status: "active" });
+  });
+
+  test("the very first sign-up ever becomes an active admin, no ADMIN_EMAIL needed", async () => {
+    delete process.env.ADMIN_EMAIL;
+    const t = convexTest(schema, modules);
+
+    await signUp(t, { email: "patron@example.com", password: "motdepasse" });
+
+    const [user] = await users(t);
+    expect(user).toMatchObject({ role: "admin", status: "active" });
+  });
+
+  test("a second sign-up, with no ADMIN_EMAIL, still lands pending", async () => {
+    delete process.env.ADMIN_EMAIL;
+    const t = convexTest(schema, modules);
+
+    await signUp(t, { email: "patron@example.com", password: "motdepasse" });
+    await signUp(t, { email: "employe@example.com", password: "motdepasse" });
+
+    const employee = (await users(t)).find((u) => u.email === "employe@example.com");
+    expect(employee).toMatchObject({ role: "employee", status: "pending" });
   });
 
   test("a second sign-up on the same email is refused", async () => {
