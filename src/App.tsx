@@ -1,5 +1,5 @@
 import { Authenticated, Unauthenticated, AuthLoading, useQuery } from "convex/react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 import { api } from "../convex/_generated/api";
@@ -27,9 +27,12 @@ function AdminOnly({ isAdmin, children }: { isAdmin: boolean; children: React.Re
   return isAdmin ? <>{children}</> : <Navigate to="/" replace />;
 }
 
+const KIOSK_PATH = "/admin/kiosque";
+
 function Authed() {
   const me = useQuery(api.auth.me);
   const { locked, unlock } = useKioskLock();
+  const { pathname } = useLocation();
 
   if (me === undefined) return <Splash />;
   if (me === null) return <Splash />;
@@ -41,11 +44,21 @@ function Authed() {
   // Guarding only the kiosk's own close button would achieve nothing: the
   // back button and the address bar both walk straight past it, and the
   // screen is sitting unattended in the shop under an admin session.
+  //
+  // The lock redirects to the kiosk route rather than rendering <Kiosk />
+  // here. Rendering it in two places meant two positions in the tree, so
+  // unlocking unmounted one and mounted the other -- a fresh mount, whose
+  // effects re-locked the screen and rotated the code. The password then had
+  // to be typed twice, and the first attempt looked like it had only reset
+  // the QR. One mount site, one lock.
   if (locked) {
-    if (isAdmin) return <Kiosk />;
-    // A non-admin can never be behind this lock; clear the stale flag rather
-    // than trapping them on a screen they have no business seeing.
-    unlock();
+    if (isAdmin) {
+      if (pathname !== KIOSK_PATH) return <Navigate to={KIOSK_PATH} replace />;
+    } else {
+      // A non-admin can never be behind this lock; clear the stale flag rather
+      // than trapping them on a screen they have no business seeing.
+      unlock();
+    }
   }
 
   // The kiosk is deliberately outside the layout: it is a full-screen display,
@@ -53,7 +66,7 @@ function Authed() {
   return (
     <Routes>
       <Route
-        path="/admin/kiosque"
+        path={KIOSK_PATH}
         element={
           <AdminOnly isAdmin={isAdmin}>
             <Kiosk />
