@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "convex dev --tail-logs disable --start 'vite'",
+    "dev": "convex dev --tail-logs disable --start \"vite\"",
     "dev:web": "vite",
     "dev:convex": "convex dev",
     "build": "tsc -b && vite build",
