@@ -38,19 +38,19 @@ export function DayList({ days }: { days: Day[] | undefined }) {
   }
 
   return (
-    <ul className="divide-y border-y">
+    <div className="space-y-4">
       {days.map((day) => (
-        <li key={day.date} className="py-3">
-          <div className="flex items-baseline justify-between gap-4">
-            <p className="text-sm capitalize text-muted-foreground">
+        <div key={day.date} className="rounded-xl border bg-card p-4">
+          <div className="flex items-baseline justify-between gap-4 border-b pb-3">
+            <p className="text-sm font-medium capitalize">
               {longDate(day.date)}
             </p>
-            <p className="tnum shrink-0 text-sm">
+            <p className="tnum shrink-0 text-sm text-muted-foreground">
               Total {formatMinutes(day.minutes)}
             </p>
           </div>
 
-          <div className="mt-1 divide-y divide-border/50">
+          <div className="mt-2 divide-y divide-border/50">
             {withSpans(day.punches).map((p) => (
               <PunchRow
                 key={p.at}
@@ -64,12 +64,12 @@ export function DayList({ days }: { days: Day[] | undefined }) {
           {day.incomplete && (
             // Stated plainly rather than closed at a guessed time — inventing
             // an end time would fabricate worked hours.
-            <p className="pt-1 text-xs text-exit">
+            <p className="pt-2 text-xs text-exit">
               Sortie manquante — journée incomplète.
             </p>
           )}
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
