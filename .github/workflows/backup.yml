@@ -1,0 +1,39 @@
+name: Weekly backup
+
+# Convex is the only data store here, with no automatic point-in-time
+# restore on this plan tier — this export is the actual backup. Runs on
+# GitHub's own clock (not Coolify, which never runs on a schedule) and keeps
+# the snapshot as a workflow artifact rather than standing up storage for it.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # every Monday, 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  export:
+    name: Export Convex data
+    runs-on: ubuntu-latest
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Export
+        run: npx convex export --path backup.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: convex-backup-${{ github.run_id }}
+          path: backup.zip
+          # GitHub's ceiling is 400 days; kept short since this is a rolling
+          # safety net, not an archive — pull a copy offline for anything
+          # that needs to outlive it.
+          retention-days: 90

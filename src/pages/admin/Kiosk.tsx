@@ -7,6 +7,7 @@ import { Lock } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Wordmark } from "@/components/Wordmark";
 import { KioskUnlockDialog } from "@/components/KioskUnlockDialog";
+import { ConnectionBanner } from "@/components/ConnectionBanner";
 import { useKioskLock } from "@/lib/useKioskLock";
 
 /** Matches the 60s TTL in convex/kiosk.ts, halved: a code is always replaced
@@ -84,6 +85,10 @@ export function Kiosk() {
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center gap-10 bg-black px-6 py-10">
+      <div className="absolute inset-x-0 top-0">
+        <ConnectionBanner />
+      </div>
+
       <button
         type="button"
         onClick={() => setAsking(true)}

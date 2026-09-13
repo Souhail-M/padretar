@@ -3,6 +3,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { LogOut } from "lucide-react";
 
 import { Wordmark } from "./Wordmark";
+import { ConnectionBanner } from "./ConnectionBanner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ export function Layout({ isAdmin, nom }: { isAdmin: boolean; nom: string }) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
+        <ConnectionBanner />
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
           <Wordmark className="text-base shrink-0" />
           <div className="flex items-center gap-1 text-sm">
