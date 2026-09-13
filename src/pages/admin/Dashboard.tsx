@@ -6,9 +6,49 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { PunchRow } from "@/components/PunchRow";
 import { KioskPasswordCard } from "@/components/KioskPasswordCard";
+import { ExportCsvButtons } from "@/components/ExportCsvButtons";
 import { cn } from "@/lib/utils";
 import { formatMinutes } from "@/lib/format";
 import { minutesSince, useNow } from "@/lib/useNow";
+
+/** One glanceable number, the vocabulary of a dashboard's top row. */
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border p-4">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="tnum mt-1 text-2xl">{value}</p>
+    </div>
+  );
+}
+
+/**
+ * Total minutes worked today, across everyone, live.
+ *
+ * `recentActivity` gives raw punches, not durations — this pairs each in
+ * with the out right after it, same rule as groupByDay in convex/badges.ts,
+ * but across users. A shift still open counts up to `now`, so the tile ticks
+ * instead of freezing at the last punch — the point of a live dashboard.
+ */
+function todayMinutesTotal(feed: { userId: string; at: number; type: "in" | "out" }[], now: number) {
+  const byUser = new Map<string, typeof feed>();
+  for (const p of feed) byUser.set(p.userId, [...(byUser.get(p.userId) ?? []), p]);
+
+  let total = 0;
+  for (const punches of byUser.values()) {
+    let openedAt: number | null = null;
+    for (const p of punches) {
+      if (p.type === "in") openedAt = p.at;
+      else if (openedAt !== null) {
+        total += p.at - openedAt;
+        openedAt = null;
+      }
+    }
+    if (openedAt !== null) total += now - openedAt;
+  }
+  return Math.round(total / 60_000);
+}
 
 export function Dashboard() {
   const presence = useQuery(api.badges.whoIsIn);
@@ -20,6 +60,7 @@ export function Dashboard() {
   const now = useNow();
 
   const pending = employees?.filter((e) => e.status === "pending") ?? [];
+  const activeCount = employees?.filter((e) => e.status === "active").length ?? 0;
   const today = new Date().toISOString().slice(0, 10);
   const insideCount = presence?.filter((r) => r.isIn).length ?? 0;
 
@@ -27,6 +68,7 @@ export function Dashboard() {
   const todayFeed = (activity ?? [])
     .filter((a) => a.date === today)
     .sort((a, b) => a.at - b.at);
+  const todayMinutes = todayMinutesTotal(todayFeed, now);
 
   return (
     <div className="space-y-8">
@@ -42,6 +84,13 @@ export function Dashboard() {
           </Button>
         </div>
       )}
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Présents" value={`${insideCount}`} />
+        <StatTile label="Employés actifs" value={`${activeCount}`} />
+        <StatTile label="Heures aujourd'hui" value={formatMinutes(todayMinutes)} />
+        <StatTile label="En attente" value={`${pending.length}`} />
+      </div>
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
@@ -147,6 +196,13 @@ export function Dashboard() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Export
+        </h2>
+        <ExportCsvButtons />
       </section>
 
       <section className="space-y-3">

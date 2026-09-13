@@ -244,6 +244,35 @@ describe("admin validation", () => {
     expect(await employee.query(api.badges.mine, {})).toHaveLength(1);
   });
 
+  test("MAX_EMPLOYEES refuses to approve past the plan's cap", async () => {
+    process.env.MAX_EMPLOYEES = "1"; // the admin alone already fills it
+    const { admin, userId } = await shopWithPending();
+
+    await expect(
+      admin.mutation(api.employees.approve, { userId }),
+    ).rejects.toThrow(/Limite de 1 employés/);
+    delete process.env.MAX_EMPLOYEES;
+  });
+
+  test("MAX_EMPLOYEES also guards re-activating a disabled account", async () => {
+    process.env.MAX_EMPLOYEES = "2";
+    const { t, admin, userId } = await shopWithPending();
+    await admin.mutation(api.employees.approve, { userId }); // now 2/2
+
+    const otherId = await t.run(async (ctx) =>
+      ctx.db.insert("users", {
+        email: "autre@example.com",
+        role: "employee",
+        status: "disabled",
+      }),
+    );
+
+    await expect(
+      admin.mutation(api.employees.setStatus, { userId: otherId, status: "active" }),
+    ).rejects.toThrow(/Limite de 2 employés/);
+    delete process.env.MAX_EMPLOYEES;
+  });
+
   test("an admin cannot lock themselves out", async () => {
     const { admin, adminId } = await shopWithPending();
 

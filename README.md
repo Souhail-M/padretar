@@ -31,6 +31,29 @@ Pour que le responsable puisse récupérer son mot de passe seul (voir
 npx convex env set AUTH_RESEND_KEY re_xxxxxxxx
 ```
 
+## Forfait (limites par client)
+
+Un seul déploiement Convex par client — pas de table `plan`, juste des
+variables d'env lues par `convex/plan.ts`, posées une fois à la vente :
+
+| Variable | Rôle | Absente = |
+|---|---|---|
+| `RETENTION_MONTHS` | Purge quotidienne des pointages plus vieux que N mois (`convex/crons.ts`) | illimité |
+| `MAX_EMPLOYEES` | Bloque `approve`/réactivation au-delà de N comptes actifs | illimité |
+| `CSV_EXPORT` | Active l'export CSV (`true` pour l'activer) | désactivé |
+
+```bash
+npx convex env set RETENTION_MONTHS 6
+npx convex env set MAX_EMPLOYEES 8
+npx convex env set CSV_EXPORT true
+```
+
+Export CSV (bouton « Semaine/Mois (CSV) », sur le tableau de bord pour tout
+le monde, sur la fiche d'un employé pour lui seul) : une ligne par vacation
+(entrée → sortie), un total par employé, un total général sur l'export
+global. `;` en séparateur et un BOM UTF-8 pour s'ouvrir proprement dans Excel
+français, accents compris.
+
 | Commande | Rôle |
 |---|---|
 | `npm run dev` | Convex + Vite |
@@ -189,6 +212,8 @@ convex/
   employees.ts   validation et fiches
   password.ts    réinitialisation (par un admin en personne, ou par email)
   ResendOTPPasswordReset.ts  code de réinitialisation envoyé par email
+  plan.ts        limites du forfait, lues depuis l'env (voir plus bas)
+  crons.ts       purge quotidienne des pointages hors rétention
 src/
   pages/         écrans employé puis admin/
   components/    SignIn, Layout, PunchDialog, DayList

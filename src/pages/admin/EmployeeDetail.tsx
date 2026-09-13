@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { DayList } from "@/components/DayList";
+import { ExportCsvButtons } from "@/components/ExportCsvButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,14 +154,16 @@ export function EmployeeDetail() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Aucun email n'est envoyé : vous donnez le nouveau mot de passe à
+          Aucun email n'est envoyé ici : vous donnez le nouveau mot de passe à
           l'employé, qui le change ensuite s'il le souhaite. Ses sessions
-          ouvertes sont fermées.
+          ouvertes sont fermées. L'employé peut aussi se débrouiller seul avec
+          « Mot de passe oublié ? » sur l'écran de connexion, qui lui envoie un
+          code par email.
         </p>
       </section>
 
       <section className="space-y-2">
-        <div className="flex items-baseline justify-between gap-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Totaux
           </h2>
@@ -181,6 +184,7 @@ export function EmployeeDetail() {
             </Button>
           </div>
         </div>
+        <ExportCsvButtons userId={userId} />
 
         {timesheet === undefined ? null : shown.length === 0 ? (
           <p className="text-sm text-muted-foreground">Aucun pointage.</p>

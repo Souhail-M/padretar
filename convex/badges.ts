@@ -1,9 +1,19 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { requireActive, requireAdmin } from "./lib/auth";
-import { dayKey, mondayOf, timeLabel } from "./lib/day";
+import {
+  dayKey,
+  daysInMonth,
+  formatMinutes,
+  mondayOf,
+  monthsAgo,
+  timeLabel,
+  weekDays,
+} from "./lib/day";
+import { toCsv } from "./lib/csv";
+import { planLimits } from "./plan";
 
 /** How far back the history screens look. A shop punches ~4x/day, so this is
  *  roughly a year for one person. */
@@ -98,7 +108,7 @@ export type Day = {
  * A day that ends on an unpaired "in" is reported as incomplete rather than
  * being closed at an invented time.
  */
-function groupByDay(punches: Doc<"badges">[]): Day[] {
+export function groupByDay(punches: Doc<"badges">[]): Day[] {
   const byDate = new Map<string, Doc<"badges">[]>();
   for (const p of punches) {
     const key = dayKey(p.at);
@@ -282,5 +292,106 @@ export const recentActivity = query({
         };
       }),
     );
+  },
+});
+
+/**
+ * Deletes punches older than the plan's retention window (convex/plan.ts).
+ * A no-op when unlimited. Runs daily via convex/crons.ts, in a bounded batch
+ * so one run never blocks on an unbounded delete — a backlog just clears
+ * over a few days instead of all at once.
+ */
+export const purgeOld = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const { retentionMonths } = planLimits();
+    if (retentionMonths === null) return null;
+
+    const cutoff = monthsAgo(retentionMonths);
+    const old = await ctx.db
+      .query("badges")
+      .withIndex("by_at", (q) => q.lt("at", cutoff))
+      .take(500);
+    for (const badge of old) await ctx.db.delete(badge._id);
+    return null;
+  },
+});
+
+/**
+ * CSV of punches for the current week or month — one shift (in→out) per row,
+ * for one employee (`userId`) or every non-pending employee (omitted). This
+ * is the payroll export, so admin only. Refuses outright if the plan doesn't
+ * include it (convex/plan.ts CSV_EXPORT).
+ *
+ * ';' delimiter and a leading BOM (see lib/csv.ts) so it opens correctly,
+ * accents included, in a plain double-click on French Excel.
+ */
+export const exportCsv = query({
+  args: { userId: v.optional(v.id("users")), period: v.union(v.literal("week"), v.literal("month")) },
+  returns: v.string(),
+  handler: async (ctx, { userId, period }) => {
+    await requireAdmin(ctx);
+    if (!planLimits().csvExport) {
+      throw new Error("L'export CSV n'est pas inclus dans ce forfait.");
+    }
+
+    const today = dayKey(Date.now());
+    const dates = period === "week" ? weekDays(today) : daysInMonth(today.slice(0, 7));
+    const start = Date.parse(`${dates[0]}T00:00:00Z`);
+    const end = Date.parse(`${dates[dates.length - 1]}T23:59:59.999Z`);
+
+    const targets = userId
+      ? [await ctx.db.get(userId)].filter((u): u is Doc<"users"> => u !== null)
+      : (await ctx.db.query("users").collect()).filter((u) => u.status !== "pending");
+    targets.sort((a, b) => (a.nom || a.email || "").localeCompare(b.nom || b.email || ""));
+
+    const rows: string[][] = [
+      ["Dar as Saada — Padretar"],
+      [
+        period === "week"
+          ? `Export hebdomadaire — semaine du ${dates[0]}`
+          : `Export mensuel — ${dates[0].slice(0, 7)}`,
+      ],
+      [`Généré le ${dayKey(Date.now())} à ${timeLabel(Date.now())}`],
+      [],
+      ["Employé", "Date", "Entrée", "Sortie", "Durée"],
+    ];
+    let grandTotal = 0;
+
+    for (const user of targets) {
+      const punches = await ctx.db
+        .query("badges")
+        .withIndex("by_user_at", (q) => q.eq("userId", user._id).gte("at", start).lte("at", end))
+        .collect();
+      const name = user.nom || user.email || "—";
+      let employeeTotal = 0;
+
+      for (const day of groupByDay(punches).slice().reverse()) {
+        // One row per shift: pair each entry with the exit right after it,
+        // same rule as the day list in the app (withSpans in DayList.tsx).
+        let openedAt: number | null = null;
+        for (const p of day.punches) {
+          if (p.type === "in") {
+            openedAt = p.at;
+          } else if (openedAt !== null) {
+            const minutes = Math.round((p.at - openedAt) / 60_000);
+            rows.push([name, day.date, timeLabel(openedAt), p.label, formatMinutes(minutes)]);
+            openedAt = null;
+          }
+        }
+        if (openedAt !== null) {
+          rows.push([name, day.date, timeLabel(openedAt), "—", "sortie manquante"]);
+        }
+        employeeTotal += day.minutes;
+      }
+
+      rows.push([`Total ${name}`, "", "", "", formatMinutes(employeeTotal)]);
+      grandTotal += employeeTotal;
+    }
+
+    if (!userId) rows.push(["Total général", "", "", "", formatMinutes(grandTotal)]);
+
+    return toCsv(rows);
   },
 });

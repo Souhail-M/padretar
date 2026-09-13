@@ -2,9 +2,9 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { dayKey, formatMinutes, minutesBetween } from "./lib/day";
+import { dayKey, formatMinutes, minutesBetween, monthsAgo } from "./lib/day";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -130,42 +130,42 @@ describe("punch", () => {
   });
 });
 
-describe("weekly and monthly totals", () => {
-  /** A shop with an admin reading the timesheet of one employee. */
-  async function shopWithHistory(punches: { at: string; type: "in" | "out" }[]) {
-    const t = convexTest(schema, modules);
+/** A shop with an admin reading the timesheet of one employee. */
+async function shopWithHistory(punches: { at: string; type: "in" | "out" }[]) {
+  const t = convexTest(schema, modules);
 
-    const { adminId, userId } = await t.run(async (ctx) => {
-      const userId = await ctx.db.insert("users", {
-        email: "employe@example.com",
-        role: "employee",
-        status: "active",
-      });
-      for (const p of punches) {
-        await ctx.db.insert("badges", {
-          userId,
-          at: Date.parse(p.at),
-          type: p.type,
-        });
-      }
-      return {
-        userId,
-        adminId: await ctx.db.insert("users", {
-          email: "patron@example.com",
-          role: "admin",
-          status: "active",
-        }),
-      };
+  const { adminId, userId } = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", {
+      email: "employe@example.com",
+      role: "employee",
+      status: "active",
     });
-
+    for (const p of punches) {
+      await ctx.db.insert("badges", {
+        userId,
+        at: Date.parse(p.at),
+        type: p.type,
+      });
+    }
     return {
-      t,
       userId,
-      admin: t.withIdentity({ subject: `${adminId}|session` }),
-      employee: t.withIdentity({ subject: `${userId}|session` }),
+      adminId: await ctx.db.insert("users", {
+        email: "patron@example.com",
+        role: "admin",
+        status: "active",
+      }),
     };
-  }
+  });
 
+  return {
+    t,
+    userId,
+    admin: t.withIdentity({ subject: `${adminId}|session` }),
+    employee: t.withIdentity({ subject: `${userId}|session` }),
+  };
+}
+
+describe("weekly and monthly totals", () => {
   test("groups days into Monday weeks and calendar months", async () => {
     // Paris is UTC+2 in August, so the offsets are written out explicitly.
     const { admin, userId } = await shopWithHistory([
@@ -254,6 +254,113 @@ describe("weekly and monthly totals", () => {
         password: "motdepasse",
       }),
     ).rejects.toThrow(/administrateurs/);
+  });
+});
+
+describe("retention", () => {
+  test("purgeOld deletes punches past RETENTION_MONTHS and keeps the rest", async () => {
+    process.env.RETENTION_MONTHS = "6";
+    const t = convexTest(schema, modules);
+
+    const userId = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "employe@example.com",
+        role: "employee",
+        status: "active",
+      });
+      await ctx.db.insert("badges", { userId, at: monthsAgo(7), type: "in" }); // too old
+      await ctx.db.insert("badges", { userId, at: monthsAgo(1), type: "in" }); // kept
+      return userId;
+    });
+
+    await t.mutation(internal.badges.purgeOld, {});
+
+    const remaining = await t.run(async (ctx) =>
+      ctx.db
+        .query("badges")
+        .withIndex("by_user_at", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+    expect(remaining).toHaveLength(1);
+    delete process.env.RETENTION_MONTHS;
+  });
+
+  test("purgeOld is a no-op with no RETENTION_MONTHS set", async () => {
+    delete process.env.RETENTION_MONTHS;
+    const t = convexTest(schema, modules);
+
+    await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", {
+        email: "e@example.com",
+        role: "employee",
+        status: "active",
+      });
+      await ctx.db.insert("badges", { userId, at: monthsAgo(24), type: "in" });
+    });
+
+    await t.mutation(internal.badges.purgeOld, {});
+    const remaining = await t.run(async (ctx) => ctx.db.query("badges").collect());
+    expect(remaining).toHaveLength(1);
+  });
+});
+
+describe("CSV export", () => {
+  test("refuses when the plan doesn't include it", async () => {
+    delete process.env.CSV_EXPORT;
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T17:00:00+02:00", type: "out" },
+    ]);
+    await expect(
+      admin.query(api.badges.exportCsv, { userId, period: "month" }),
+    ).rejects.toThrow(/pas inclus/);
+  });
+
+  test("refuses an employee", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { employee, userId } = await shopWithHistory([]);
+    await expect(
+      employee.query(api.badges.exportCsv, { userId, period: "week" }),
+    ).rejects.toThrow(/administrateurs/);
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("one employee's export lists their shifts and a total, no grand total", async () => {
+    process.env.CSV_EXPORT = "true";
+    const today = dayKey(Date.now());
+    const { admin, userId } = await shopWithHistory([
+      { at: `${today}T09:00:00Z`, type: "in" },
+      { at: `${today}T17:00:00Z`, type: "out" },
+    ]);
+
+    const csv = await admin.query(api.badges.exportCsv, { userId, period: "month" });
+    expect(csv).toContain("Employé;Date;Entrée;Sortie;Durée");
+    // The seeded user has no `nom`, so the export falls back to their email.
+    expect(csv).toContain("Total employe@example.com");
+    expect(csv).not.toContain("Total général");
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("the global export sums every employee into one grand total", async () => {
+    process.env.CSV_EXPORT = "true";
+    const today = dayKey(Date.now());
+    const { t, admin } = await shopWithHistory([
+      { at: `${today}T09:00:00Z`, type: "in" },
+      { at: `${today}T17:00:00Z`, type: "out" }, // 8h
+    ]);
+    await t.run(async (ctx) => {
+      const otherId = await ctx.db.insert("users", {
+        email: "autre@example.com",
+        role: "employee",
+        status: "active",
+      });
+      await ctx.db.insert("badges", { userId: otherId, at: Date.parse(`${today}T09:00:00Z`), type: "in" });
+      await ctx.db.insert("badges", { userId: otherId, at: Date.parse(`${today}T13:00:00Z`), type: "out" }); // 4h
+    });
+
+    const csv = await admin.query(api.badges.exportCsv, { period: "week" });
+    expect(csv).toContain("Total général;;;;12h");
+    delete process.env.CSV_EXPORT;
   });
 });
 

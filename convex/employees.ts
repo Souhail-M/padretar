@@ -1,7 +1,25 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { roleEnum } from "./schema";
 import { requireAdmin } from "./lib/auth";
+import { planLimits } from "./plan";
+
+/** Throws once the plan's employee cap (convex/plan.ts) is already reached. */
+async function assertRoomForOneMore(ctx: MutationCtx) {
+  const { maxEmployees } = planLimits();
+  if (maxEmployees === null) return;
+
+  const activeCount = (
+    await ctx.db
+      .query("users")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect()
+  ).length;
+  if (activeCount >= maxEmployees) {
+    throw new Error(`Limite de ${maxEmployees} employés atteinte pour ce forfait.`);
+  }
+}
 
 /** Everyone, pending accounts first — those are the ones needing a decision. */
 export const list = query({
@@ -42,6 +60,7 @@ export const approve = mutation({
   returns: v.null(),
   handler: async (ctx, { userId }) => {
     await requireAdmin(ctx);
+    await assertRoomForOneMore(ctx);
     await ctx.db.patch(userId, { status: "active" });
     return null;
   },
@@ -62,6 +81,7 @@ export const setStatus = mutation({
     if (admin._id === userId && status === "disabled") {
       throw new Error("Vous ne pouvez pas désactiver votre propre compte");
     }
+    if (status === "active") await assertRoomForOneMore(ctx);
     await ctx.db.patch(userId, { status });
     return null;
   },

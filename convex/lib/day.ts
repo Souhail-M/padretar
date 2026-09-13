@@ -59,3 +59,20 @@ export function formatMinutes(total: number): string {
   const m = total % 60;
   return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
 }
+
+/** Timestamp `months` calendar months before now — the retention cutoff. */
+export function monthsAgo(months: number): number {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.getTime();
+}
+
+/** Every "YYYY-MM-DD" in the calendar month "YYYY-MM". */
+export function daysInMonth(month: string): string[] {
+  const [y, m] = month.split("-").map(Number);
+  const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return Array.from(
+    { length: count },
+    (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`,
+  );
+}
