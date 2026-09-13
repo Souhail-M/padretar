@@ -22,7 +22,7 @@ export function SignIn() {
         <p className="mb-10 text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Padretar
         </p>
-        <ForgotPassword onDone={() => setForgot(false)} />
+        <ForgotPassword onCancel={() => setForgot(false)} onSuccess={() => setForgot(false)} />
       </div>
     );
   }

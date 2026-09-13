@@ -13,7 +13,15 @@ import { Label } from "@/components/ui/label";
  * responsable) — see convex/password.ts. It works the same for an employee,
  * who may prefer it to interrupting the responsable in person.
  */
-export function ForgotPassword({ onDone }: { onDone: () => void }) {
+export function ForgotPassword({
+  onCancel,
+  onSuccess,
+}: {
+  onCancel: () => void;
+  /** Called once the reset actually lands — the reset step signs in with
+   *  the new password, so the caller can treat this as "signed in". */
+  onSuccess: () => void;
+}) {
   const { signIn } = useAuthActions();
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
@@ -43,7 +51,7 @@ export function ForgotPassword({ onDone }: { onDone: () => void }) {
     const formData = new FormData(event.currentTarget);
     try {
       await signIn("password", formData);
-      onDone();
+      onSuccess();
     } catch {
       setError("Code incorrect ou expiré.");
     } finally {
@@ -98,7 +106,7 @@ export function ForgotPassword({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-        onClick={onDone}
+        onClick={onCancel}
       >
         Retour à la connexion
       </button>
