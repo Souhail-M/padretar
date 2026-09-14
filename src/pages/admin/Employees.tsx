@@ -38,34 +38,36 @@ export function Employees() {
       {employees === undefined ? null : employees.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucun compte.</p>
       ) : (
-        <ul className="divide-y border-y">
+        <div className="grid gap-3 sm:grid-cols-2">
           {employees.map((employee) => (
-            <li
+            <div
               key={employee._id}
-              className="flex flex-wrap items-center justify-between gap-3 py-3"
+              className="flex flex-col gap-3 rounded-xl border bg-card p-4"
             >
-              <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
                 <Link
                   to={`/admin/employes/${employee._id}`}
-                  className="underline-offset-4 hover:underline"
+                  className="min-w-0 truncate font-medium underline-offset-4 hover:underline"
                 >
                   {employee.nom || employee.email}
                 </Link>
-                <p className="truncate text-sm text-muted-foreground">
-                  {[employee.poste, employee.email].filter(Boolean).join(" · ")}
-                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  {employee.role === "admin" && (
+                    <Badge variant="outline">Admin</Badge>
+                  )}
+                  <Badge
+                    variant={employee.status === "active" ? "default" : "outline"}
+                  >
+                    {STATUS_LABEL[employee.status]}
+                  </Badge>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {employee.role === "admin" && (
-                  <Badge variant="outline">Admin</Badge>
-                )}
-                <Badge
-                  variant={employee.status === "active" ? "default" : "outline"}
-                >
-                  {STATUS_LABEL[employee.status]}
-                </Badge>
+              <p className="truncate text-sm text-muted-foreground">
+                {[employee.poste, employee.email].filter(Boolean).join(" · ")}
+              </p>
 
+              <div className="flex justify-end">
                 {employee.status === "pending" && (
                   <Button
                     size="sm"
@@ -108,9 +110,9 @@ export function Employees() {
                   </Button>
                 )}
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

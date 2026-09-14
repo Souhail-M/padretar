@@ -59,7 +59,7 @@ export function KioskPasswordCard() {
   const configured = exitState?.configured === true;
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <div className="space-y-3 rounded-xl border bg-card p-4">
       <div className="space-y-1">
         <p className="text-sm font-medium">Sortie du kiosque</p>
         <p className="text-sm text-muted-foreground">

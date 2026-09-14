@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { dayKey, formatMinutes, minutesBetween, monthsAgo } from "./lib/day";
+import { dayKey, formatMinutes, minutesBetween, monthsAgo, parisToUtc } from "./lib/day";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -257,6 +257,87 @@ describe("weekly and monthly totals", () => {
   });
 });
 
+describe("manual punch corrections", () => {
+  test("editPunch fixes a wrong time and type", async () => {
+    const { t, admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+    ]);
+    const [badge] = await t.run(async (ctx) => ctx.db.query("badges").collect());
+
+    await admin.mutation(api.badges.editPunch, {
+      badgeId: badge._id,
+      date: "2026-08-03",
+      time: "09:30",
+      type: "out",
+    });
+
+    const [updated] = await t.run(async (ctx) => ctx.db.query("badges").collect());
+    expect(updated.type).toBe("out");
+    // 09:30 Paris in August (UTC+2) is 07:30 UTC.
+    expect(new Date(updated.at).toISOString()).toBe("2026-08-03T07:30:00.000Z");
+  });
+
+  test("addPunch fills the exit a forgotten clock-out never recorded", async () => {
+    const { t, admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+    ]);
+
+    let days = (await admin.query(api.badges.forEmployee, { userId })).days;
+    expect(days[0].incomplete).toBe(true);
+
+    await admin.mutation(api.badges.addPunch, {
+      userId,
+      date: "2026-08-03",
+      time: "17:00",
+      type: "out",
+    });
+
+    days = (await admin.query(api.badges.forEmployee, { userId })).days;
+    expect(days[0].incomplete).toBe(false);
+    expect(days[0].minutes).toBe(480);
+  });
+
+  test("deletePunch removes an erroneous duplicate", async () => {
+    const { t, admin } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T09:00:05+02:00", type: "in" },
+    ]);
+    const [first] = await t.run(async (ctx) => ctx.db.query("badges").collect());
+
+    await admin.mutation(api.badges.deletePunch, { badgeId: first._id });
+
+    const remaining = await t.run(async (ctx) => ctx.db.query("badges").collect());
+    expect(remaining).toHaveLength(1);
+  });
+
+  test("an employee cannot edit, add or delete a punch", async () => {
+    const { t, employee, userId } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+    ]);
+    const [badge] = await t.run(async (ctx) => ctx.db.query("badges").collect());
+
+    await expect(
+      employee.mutation(api.badges.editPunch, {
+        badgeId: badge._id,
+        date: "2026-08-03",
+        time: "10:00",
+        type: "in",
+      }),
+    ).rejects.toThrow(/administrateurs/);
+    await expect(
+      employee.mutation(api.badges.addPunch, {
+        userId,
+        date: "2026-08-03",
+        time: "17:00",
+        type: "out",
+      }),
+    ).rejects.toThrow(/administrateurs/);
+    await expect(
+      employee.mutation(api.badges.deletePunch, { badgeId: badge._id }),
+    ).rejects.toThrow(/administrateurs/);
+  });
+});
+
 describe("retention", () => {
   test("purgeOld deletes punches past RETENTION_MONTHS and keeps the rest", async () => {
     process.env.RETENTION_MONTHS = "6";
@@ -304,23 +385,23 @@ describe("retention", () => {
   });
 });
 
-describe("CSV export", () => {
-  test("refuses when the plan doesn't include it", async () => {
+describe("Excel export", () => {
+  test("exportData refuses when the plan doesn't include it", async () => {
     delete process.env.CSV_EXPORT;
     const { admin, userId } = await shopWithHistory([
       { at: "2026-08-03T09:00:00+02:00", type: "in" },
       { at: "2026-08-03T17:00:00+02:00", type: "out" },
     ]);
     await expect(
-      admin.query(api.badges.exportCsv, { userId, period: "month" }),
+      admin.query(internal.badges.exportData, { userId, period: "month" }),
     ).rejects.toThrow(/pas inclus/);
   });
 
-  test("refuses an employee", async () => {
+  test("exportData refuses an employee", async () => {
     process.env.CSV_EXPORT = "true";
     const { employee, userId } = await shopWithHistory([]);
     await expect(
-      employee.query(api.badges.exportCsv, { userId, period: "week" }),
+      employee.query(internal.badges.exportData, { userId, period: "week" }),
     ).rejects.toThrow(/administrateurs/);
     delete process.env.CSV_EXPORT;
   });
@@ -333,11 +414,15 @@ describe("CSV export", () => {
       { at: `${today}T17:00:00Z`, type: "out" },
     ]);
 
-    const csv = await admin.query(api.badges.exportCsv, { userId, period: "month" });
-    expect(csv).toContain("Employé;Date;Entrée;Sortie;Durée");
+    const payload = await admin.query(internal.badges.exportData, {
+      userId,
+      period: "month",
+    });
+    expect(payload.employees).toHaveLength(1);
     // The seeded user has no `nom`, so the export falls back to their email.
-    expect(csv).toContain("Total employe@example.com");
-    expect(csv).not.toContain("Total général");
+    expect(payload.employees[0].name).toBe("employe@example.com");
+    expect(payload.employees[0].totalMinutes).toBe(480);
+    expect(payload.grandTotalMinutes).toBeNull();
     delete process.env.CSV_EXPORT;
   });
 
@@ -354,12 +439,57 @@ describe("CSV export", () => {
         role: "employee",
         status: "active",
       });
-      await ctx.db.insert("badges", { userId: otherId, at: Date.parse(`${today}T09:00:00Z`), type: "in" });
-      await ctx.db.insert("badges", { userId: otherId, at: Date.parse(`${today}T13:00:00Z`), type: "out" }); // 4h
+      await ctx.db.insert("badges", {
+        userId: otherId,
+        at: Date.parse(`${today}T09:00:00Z`),
+        type: "in",
+      });
+      await ctx.db.insert("badges", {
+        userId: otherId,
+        at: Date.parse(`${today}T13:00:00Z`),
+        type: "out",
+      }); // 4h
     });
 
-    const csv = await admin.query(api.badges.exportCsv, { period: "week" });
-    expect(csv).toContain("Total général;;;;12h");
+    // Every non-pending user, including the admin themselves (0 punches here).
+    const payload = await admin.query(internal.badges.exportData, { period: "week" });
+    expect(payload.employees).toHaveLength(3);
+    expect(payload.grandTotalMinutes).toBe(720); // 12h
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a forgotten exit is flagged in the export, not fabricated", async () => {
+    process.env.CSV_EXPORT = "true";
+    const today = dayKey(Date.now());
+    const { admin, userId } = await shopWithHistory([
+      { at: `${today}T09:00:00Z`, type: "in" },
+    ]);
+
+    const payload = await admin.query(internal.badges.exportData, {
+      userId,
+      period: "week",
+    });
+    const shift = payload.employees[0].weeks[0].shifts[0];
+    expect(shift.missingExit).toBe(true);
+    expect(shift.outLabel).toBe("—");
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("toXlsx produces a real workbook", async () => {
+    process.env.CSV_EXPORT = "true";
+    const today = dayKey(Date.now());
+    const { admin, userId } = await shopWithHistory([
+      { at: `${today}T09:00:00Z`, type: "in" },
+      { at: `${today}T17:00:00Z`, type: "out" },
+    ]);
+
+    const { filename, base64 } = await admin.action(api.export.toXlsx, {
+      userId,
+      period: "month",
+    });
+    expect(filename).toMatch(/\.xlsx$/);
+    // A .xlsx is a zip container; every zip starts with this signature.
+    expect(Buffer.from(base64, "base64").subarray(0, 2).toString("latin1")).toBe("PK");
     delete process.env.CSV_EXPORT;
   });
 });
@@ -380,5 +510,12 @@ describe("day helpers", () => {
     expect(minutesBetween("14:00", "09:00")).toBe(0); // never negative
     expect(formatMinutes(300)).toBe("5h");
     expect(formatMinutes(447)).toBe("7h27");
+  });
+
+  test("parisToUtc reads a typed date+time as Paris local, DST included", () => {
+    // Summer, UTC+2.
+    expect(parisToUtc("2026-08-03", "09:00")).toBe(Date.parse("2026-08-03T07:00:00Z"));
+    // Winter, UTC+1.
+    expect(parisToUtc("2026-01-09", "09:00")).toBe(Date.parse("2026-01-09T08:00:00Z"));
   });
 });

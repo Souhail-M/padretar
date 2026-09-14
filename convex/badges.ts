@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { requireActive, requireAdmin } from "./lib/auth";
@@ -9,11 +9,12 @@ import {
   formatMinutes,
   mondayOf,
   monthsAgo,
+  parisToUtc,
   timeLabel,
   weekDays,
 } from "./lib/day";
-import { toCsv } from "./lib/csv";
 import { planLimits } from "./plan";
+import { punchEnum } from "./schema";
 
 /** How far back the history screens look. A shop punches ~4x/day, so this is
  *  roughly a year for one person. */
@@ -51,10 +52,11 @@ function isIn(last: Doc<"badges"> | null, now: number): boolean {
  * from their last punch of the same day, which removes a whole screen and a
  * whole class of mistake.
  *
- * ponytail: the toggle is bounded to the day. A forgotten clock-out simply
- * leaves that day incomplete and visible as such — no auto-close is invented,
- * because guessing an end time would silently fabricate worked hours. Add an
- * admin correction screen the first time it actually happens.
+ * The toggle is bounded to the day. A forgotten clock-out simply leaves that
+ * day incomplete and visible as such — no auto-close is invented, because
+ * guessing an end time would silently fabricate worked hours. The admin
+ * correction below (editPunch/addPunch/deletePunch) is the deliberate,
+ * visible override for when the real time is actually known.
  */
 export const punch = mutation({
   args: { code: v.string() },
@@ -84,6 +86,47 @@ export const punch = mutation({
   },
 });
 
+/**
+ * Fixes a wrong punch — admin only, and the only place a punch's time or
+ * type changes after the fact. `date`/`time` are Paris-local, like every
+ * other date in this app; converting them is lib/day.ts's job, never the
+ * client's.
+ */
+export const editPunch = mutation({
+  args: { badgeId: v.id("badges"), date: v.string(), time: v.string(), type: punchEnum },
+  returns: v.null(),
+  handler: async (ctx, { badgeId, date, time, type }) => {
+    await requireAdmin(ctx);
+    await ctx.db.patch(badgeId, { at: parisToUtc(date, time), type });
+    return null;
+  },
+});
+
+/** Adds a punch the kiosk never recorded — e.g. a forgotten exit, once the
+ *  real time is known. Admin only. */
+export const addPunch = mutation({
+  args: { userId: v.id("users"), date: v.string(), time: v.string(), type: punchEnum },
+  returns: v.null(),
+  handler: async (ctx, { userId, date, time, type }) => {
+    await requireAdmin(ctx);
+    await ctx.db.insert("badges", { userId, at: parisToUtc(date, time), type });
+    return null;
+  },
+});
+
+/** Deletes an erroneous punch — a duplicate scan, a wrong tap. Admin only.
+ *  Deletion, not disabling: a mistaken punch is not a work record worth
+ *  keeping, unlike an employee's account (see employees.ts setStatus). */
+export const deletePunch = mutation({
+  args: { badgeId: v.id("badges") },
+  returns: v.null(),
+  handler: async (ctx, { badgeId }) => {
+    await requireAdmin(ctx);
+    await ctx.db.delete(badgeId);
+    return null;
+  },
+});
+
 /** Current in/out state of the signed-in employee. */
 export const myStatus = query({
   args: {},
@@ -98,7 +141,7 @@ export const myStatus = query({
 
 export type Day = {
   date: string;
-  punches: { at: number; type: "in" | "out"; label: string }[];
+  punches: { _id: Id<"badges">; at: number; type: "in" | "out"; label: string }[];
   minutes: number;
   incomplete: boolean;
 };
@@ -136,6 +179,7 @@ export function groupByDay(punches: Doc<"badges">[]): Day[] {
       return {
         date,
         punches: asc.map((p) => ({
+          _id: p._id,
           at: p.at,
           type: p.type,
           label: timeLabel(p.at),
@@ -318,22 +362,50 @@ export const purgeOld = internalMutation({
   },
 });
 
+export type ExportShift = {
+  date: string;
+  inLabel: string;
+  outLabel: string;
+  duration: string;
+  missingExit: boolean;
+};
+export type ExportWeek = { key: string; label: string; shifts: ExportShift[]; minutes: number };
+export type ExportEmployee = { name: string; weeks: ExportWeek[]; totalMinutes: number };
+export type ExportPayload = {
+  period: "week" | "month";
+  periodLabel: string;
+  generatedAt: string;
+  employees: ExportEmployee[];
+  /** null for a single-employee export — one employee's total already is
+   *  the "grand" total, showing both would just repeat the number. */
+  grandTotalMinutes: number | null;
+};
+
 /**
- * CSV of punches for the current week or month — one shift (in→out) per row,
- * for one employee (`userId`) or every non-pending employee (omitted). This
- * is the payroll export, so admin only. Refuses outright if the plan doesn't
- * include it (convex/plan.ts CSV_EXPORT).
+ * The data behind the Excel export (convex/export.ts, the only place that
+ * builds the file) — one shift (in→out) per row, grouped by week then day,
+ * for one employee (`userId`) or every non-pending employee (omitted).
  *
- * ';' delimiter and a leading BOM (see lib/csv.ts) so it opens correctly,
- * accents included, in a plain double-click on French Excel.
+ * Admin only, and refuses outright if the plan doesn't include it
+ * (convex/plan.ts CSV_EXPORT — the flag name predates the switch from CSV to
+ * a styled Excel file; kept as-is since it's already set on every live
+ * deployment and nothing user-facing shows the name).
+ *
+ * `internalQuery` rather than `query`: the export action needs Node's
+ * `exceljs`, which can't share a file with reactive queries/mutations
+ * (Convex's "use node" directive is file-scoped), so this is called via
+ * `ctx.runQuery` from that separate Node action instead of from the client
+ * directly.
  */
-export const exportCsv = query({
-  args: { userId: v.optional(v.id("users")), period: v.union(v.literal("week"), v.literal("month")) },
-  returns: v.string(),
-  handler: async (ctx, { userId, period }) => {
+export const exportData = internalQuery({
+  args: {
+    userId: v.optional(v.id("users")),
+    period: v.union(v.literal("week"), v.literal("month")),
+  },
+  handler: async (ctx, { userId, period }): Promise<ExportPayload> => {
     await requireAdmin(ctx);
     if (!planLimits().csvExport) {
-      throw new Error("L'export CSV n'est pas inclus dans ce forfait.");
+      throw new Error("L'export n'est pas inclus dans ce forfait.");
     }
 
     const today = dayKey(Date.now());
@@ -346,17 +418,7 @@ export const exportCsv = query({
       : (await ctx.db.query("users").collect()).filter((u) => u.status !== "pending");
     targets.sort((a, b) => (a.nom || a.email || "").localeCompare(b.nom || b.email || ""));
 
-    const rows: string[][] = [
-      ["Dar as Saada — Padretar"],
-      [
-        period === "week"
-          ? `Export hebdomadaire — semaine du ${dates[0]}`
-          : `Export mensuel — ${dates[0].slice(0, 7)}`,
-      ],
-      [`Généré le ${dayKey(Date.now())} à ${timeLabel(Date.now())}`],
-      [],
-      ["Employé", "Date", "Entrée", "Sortie", "Durée"],
-    ];
+    const employees: ExportEmployee[] = [];
     let grandTotal = 0;
 
     for (const user of targets) {
@@ -364,11 +426,19 @@ export const exportCsv = query({
         .query("badges")
         .withIndex("by_user_at", (q) => q.eq("userId", user._id).gte("at", start).lte("at", end))
         .collect();
-      const name = user.nom || user.email || "—";
-      let employeeTotal = 0;
+
+      const byWeek = new Map<string, ExportWeek>();
 
       for (const day of groupByDay(punches).slice().reverse()) {
-        // One row per shift: pair each entry with the exit right after it,
+        const weekKey = mondayOf(day.date);
+        const week = byWeek.get(weekKey) ?? {
+          key: weekKey,
+          label: `Semaine du ${weekKey}`,
+          shifts: [],
+          minutes: 0,
+        };
+
+        // One shift per row: pair each entry with the exit right after it,
         // same rule as the day list in the app (withSpans in DayList.tsx).
         let openedAt: number | null = null;
         for (const p of day.punches) {
@@ -376,22 +446,43 @@ export const exportCsv = query({
             openedAt = p.at;
           } else if (openedAt !== null) {
             const minutes = Math.round((p.at - openedAt) / 60_000);
-            rows.push([name, day.date, timeLabel(openedAt), p.label, formatMinutes(minutes)]);
+            week.shifts.push({
+              date: day.date,
+              inLabel: timeLabel(openedAt),
+              outLabel: p.label,
+              duration: formatMinutes(minutes),
+              missingExit: false,
+            });
             openedAt = null;
           }
         }
         if (openedAt !== null) {
-          rows.push([name, day.date, timeLabel(openedAt), "—", "sortie manquante"]);
+          week.shifts.push({
+            date: day.date,
+            inLabel: timeLabel(openedAt),
+            outLabel: "—",
+            duration: "sortie manquante",
+            missingExit: true,
+          });
         }
-        employeeTotal += day.minutes;
+
+        week.minutes += day.minutes;
+        byWeek.set(weekKey, week);
       }
 
-      rows.push([`Total ${name}`, "", "", "", formatMinutes(employeeTotal)]);
+      const weeks = [...byWeek.values()].sort((a, b) => a.key.localeCompare(b.key));
+      const employeeTotal = weeks.reduce((sum, w) => sum + w.minutes, 0);
+
+      employees.push({ name: user.nom || user.email || "—", weeks, totalMinutes: employeeTotal });
       grandTotal += employeeTotal;
     }
 
-    if (!userId) rows.push(["Total général", "", "", "", formatMinutes(grandTotal)]);
-
-    return toCsv(rows);
+    return {
+      period,
+      periodLabel: period === "week" ? `Semaine du ${dates[0]}` : dates[0].slice(0, 7),
+      generatedAt: `${dayKey(Date.now())} à ${timeLabel(Date.now())}`,
+      employees,
+      grandTotalMinutes: userId ? null : grandTotal,
+    };
   },
 });

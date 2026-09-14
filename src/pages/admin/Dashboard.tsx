@@ -1,12 +1,12 @@
 import { useQuery } from "convex/react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight } from "lucide-react";
 
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { PunchRow } from "@/components/PunchRow";
 import { KioskPasswordCard } from "@/components/KioskPasswordCard";
-import { ExportCsvButtons } from "@/components/ExportCsvButtons";
+import { ExportExcelButtons } from "@/components/ExportExcelButtons";
 import { cn } from "@/lib/utils";
 import { formatMinutes } from "@/lib/format";
 import { minutesSince, useNow } from "@/lib/useNow";
@@ -14,7 +14,7 @@ import { minutesSince, useNow } from "@/lib/useNow";
 /** One glanceable number, the vocabulary of a dashboard's top row. */
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border p-4">
+    <div className="rounded-xl border bg-card p-4">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </p>
@@ -73,7 +73,7 @@ export function Dashboard() {
   return (
     <div className="space-y-8">
       {pending.length > 0 && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-foreground/40 p-4">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-foreground/40 bg-card p-4">
           <p className="text-sm">
             {pending.length === 1
               ? "1 compte attend votre validation."
@@ -92,128 +92,146 @@ export function Dashboard() {
         <StatTile label="En attente" value={`${pending.length}`} />
       </div>
 
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Présence
+            </h2>
+            <p className="tnum text-sm text-muted-foreground">
+              {insideCount} sur place
+            </p>
+          </div>
+
+          {presence === undefined ? null : presence.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aucun employé actif.</p>
+          ) : (
+            <div className="rounded-xl border bg-card">
+              <ul className="divide-y divide-border/50">
+                {presence.map((row) => {
+                  const Icon = row.isIn ? ArrowDownLeft : ArrowUpRight;
+                  return (
+                    <li key={row.userId}>
+                      {/* The whole row is the link: tapping a name is how you
+                          get to that employee's timesheet. */}
+                      <Link
+                        to={`/admin/employes/${row.userId}`}
+                        className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-accent/50"
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-full",
+                            row.isIn ? "bg-enter-bg text-enter" : "bg-exit-bg text-exit",
+                          )}
+                        >
+                          <Icon className="size-4" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{row.nom}</span>
+                          {row.poste && (
+                            <span className="block truncate text-sm text-muted-foreground">
+                              {row.poste}
+                            </span>
+                          )}
+                        </span>
+
+                        <span className="tnum shrink-0 text-right text-sm">
+                          {row.isIn && row.sinceAt ? (
+                            <>
+                              <span className="block font-medium uppercase tracking-wider text-enter">
+                                Dedans
+                              </span>
+                              <span className="block text-muted-foreground">
+                                depuis {row.sinceLabel} ·{" "}
+                                {formatMinutes(minutesSince(row.sinceAt, now))}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="block uppercase tracking-wider text-muted-foreground">
+                                Dehors
+                              </span>
+                              <span className="block text-muted-foreground">
+                                {row.lastLabel
+                                  ? row.lastIsToday
+                                    ? `${row.lastType === "out" ? "sorti" : "entré"} à ${row.lastLabel}`
+                                    : "aucun pointage aujourd'hui"
+                                  : "jamais pointé"}
+                              </span>
+                            </>
+                          )}
+                        </span>
+
+                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Présence
+            Pointages du jour
           </h2>
-          <p className="tnum text-sm text-muted-foreground">
-            {insideCount} sur place
-          </p>
-        </div>
+          {activity === undefined ? null : todayFeed.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aucun pointage aujourd'hui.
+            </p>
+          ) : (
+            <div className="rounded-xl border bg-card">
+              <ul className="divide-y divide-border/50">
+                {todayFeed.map((a) => (
+                  <li key={a._id}>
+                    <Link
+                      to={`/admin/employes/${a.userId}`}
+                      className="block px-1 transition-colors hover:bg-accent/50"
+                    >
+                      <PunchRow
+                        type={a.type}
+                        time={a.time}
+                        right={
+                          <span className="ml-3 min-w-0 max-w-[45%] truncate text-sm">
+                            {a.nom}
+                          </span>
+                        }
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      </div>
 
-        {presence === undefined ? null : presence.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucun employé actif.</p>
-        ) : (
-          <ul className="divide-y border-y">
-            {presence.map((row) => (
-              <li key={row.userId}>
-                {/* The whole row is the link: tapping a name is how you get to
-                    that employee's timesheet. */}
-                <Link
-                  to={`/admin/employes/${row.userId}`}
-                  className="flex items-center gap-3 py-3 transition-colors hover:bg-accent/50"
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "h-9 w-1 shrink-0 rounded-full",
-                      row.isIn ? "bg-enter" : "bg-border",
-                    )}
-                  />
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section className="space-y-3">
+          <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Export
+          </h2>
+          <div className="space-y-3 rounded-xl border bg-card p-4">
+            <p className="text-sm text-muted-foreground">
+              Semaine ou mois en cours, tous les employés.
+            </p>
+            <ExportExcelButtons />
+          </div>
+        </section>
 
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{row.nom}</span>
-                    {row.poste && (
-                      <span className="block truncate text-sm text-muted-foreground">
-                        {row.poste}
-                      </span>
-                    )}
-                  </span>
-
-                  <span className="tnum shrink-0 text-right text-sm">
-                    {row.isIn && row.sinceAt ? (
-                      <>
-                        <span className="block font-medium uppercase tracking-wider text-enter">
-                          Dedans
-                        </span>
-                        <span className="block text-muted-foreground">
-                          depuis {row.sinceLabel} ·{" "}
-                          {formatMinutes(minutesSince(row.sinceAt, now))}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="block uppercase tracking-wider text-muted-foreground">
-                          Dehors
-                        </span>
-                        <span className="block text-muted-foreground">
-                          {row.lastLabel
-                            ? row.lastIsToday
-                              ? `${row.lastType === "out" ? "sorti" : "entré"} à ${row.lastLabel}`
-                              : "aucun pointage aujourd'hui"
-                            : "jamais pointé"}
-                        </span>
-                      </>
-                    )}
-                  </span>
-
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Pointages du jour
-        </h2>
-        {activity === undefined ? null : todayFeed.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aucun pointage aujourd'hui.
-          </p>
-        ) : (
-          <ul className="divide-y border-y">
-            {todayFeed.map((a) => (
-              <li key={a._id}>
-                <Link
-                  to={`/admin/employes/${a.userId}`}
-                  className="block transition-colors hover:bg-accent/50"
-                >
-                  <PunchRow
-                    type={a.type}
-                    time={a.time}
-                    right={
-                      <span className="ml-3 min-w-0 max-w-[45%] truncate text-sm">
-                        {a.nom}
-                      </span>
-                    }
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Export
-        </h2>
-        <ExportCsvButtons />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Kiosque
-        </h2>
-        <KioskPasswordCard />
-        <Button asChild variant="outline" className="w-full">
-          <Link to="/admin/kiosque">Ouvrir l'écran kiosque</Link>
-        </Button>
-      </section>
+        <section className="space-y-3">
+          <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Kiosque
+          </h2>
+          <KioskPasswordCard />
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/admin/kiosque">Ouvrir l'écran kiosque</Link>
+          </Button>
+        </section>
+      </div>
     </div>
   );
 }

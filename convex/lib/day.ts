@@ -76,3 +76,26 @@ export function daysInMonth(month: string): string[] {
     (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`,
   );
 }
+
+/** Paris's UTC offset in minutes at that instant — DST isn't arithmetic, so
+ *  this asks Intl rather than hard-coding +1/+2. */
+function parisOffsetMinutes(ts: number): number {
+  const zoneName = new Intl.DateTimeFormat("en-US", {
+    timeZone: PARIS,
+    timeZoneName: "shortOffset",
+  })
+    .formatToParts(ts)
+    .find((p) => p.type === "timeZoneName")?.value;
+  const match = /GMT([+-]\d+)/.exec(zoneName ?? "");
+  return match ? Number(match[1]) * 60 : 0;
+}
+
+/**
+ * The timestamp meant by "YYYY-MM-DD" + "HH:MM" read as Paris local time —
+ * the admin punch-correction screen's only way to turn what someone typed
+ * into the same clock every other timestamp in this app is on.
+ */
+export function parisToUtc(date: string, time: string): number {
+  const naiveUtc = Date.parse(`${date}T${time}:00Z`);
+  return naiveUtc - parisOffsetMinutes(naiveUtc) * 60_000;
+}

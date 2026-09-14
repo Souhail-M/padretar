@@ -1,7 +1,8 @@
 import { PunchRow } from "./PunchRow";
 import { formatMinutes, longDate } from "@/lib/format";
+import type { Id } from "../../convex/_generated/dataModel";
 
-type Punch = { at: number; type: "in" | "out"; label: string };
+type Punch = { _id: Id<"badges">; at: number; type: "in" | "out"; label: string };
 
 type Day = {
   date: string;
@@ -30,8 +31,20 @@ function withSpans(punches: Punch[]) {
 /**
  * Timesheet: one day per block, one line per punch, in chronological order.
  * Shared by the employee screens and the admin employee detail.
+ *
+ * `renderRight`/`renderDayExtra` are the only admin-only hooks (edit/add a
+ * punch) — optional, so the employee-facing call sites stay exactly as they
+ * were.
  */
-export function DayList({ days }: { days: Day[] | undefined }) {
+export function DayList({
+  days,
+  renderRight,
+  renderDayExtra,
+}: {
+  days: Day[] | undefined;
+  renderRight?: (punch: Punch, date: string) => React.ReactNode;
+  renderDayExtra?: (day: Day) => React.ReactNode;
+}) {
   if (days === undefined) return null;
   if (days.length === 0) {
     return <p className="text-sm text-muted-foreground">Aucun pointage.</p>;
@@ -57,9 +70,12 @@ export function DayList({ days }: { days: Day[] | undefined }) {
                 type={p.type}
                 time={p.label}
                 duration={p.duration}
+                right={renderRight?.(p, day.date)}
               />
             ))}
           </div>
+
+          {renderDayExtra?.(day)}
 
           {day.incomplete && (
             // Stated plainly rather than closed at a guessed time — inventing
