@@ -4,15 +4,24 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { isHidden, requireActive, requireAdmin, requireTarget } from "./lib/auth";
 import {
+  addDays,
   dayKey,
-  daysInMonth,
   formatMinutes,
   mondayOf,
   monthsAgo,
   parisToUtc,
   timeLabel,
-  weekDays,
+  weekTitle,
 } from "./lib/day";
+import { exportArgs } from "./lib/exportArgs";
+import {
+  MAX_PERIOD_OPTIONS,
+  periodBounds,
+  periodTitle,
+  resolveSelection,
+  type ExportPeriodOption,
+  type ExportScale,
+} from "./lib/exportRange";
 import { planLimits } from "./plan";
 import { punchEnum } from "./schema";
 
@@ -377,7 +386,8 @@ export type ExportShift = {
 export type ExportWeek = { key: string; label: string; shifts: ExportShift[]; minutes: number };
 export type ExportEmployee = { name: string; weeks: ExportWeek[]; totalMinutes: number };
 export type ExportPayload = {
-  period: "week" | "month";
+  /** What the selection covered, for the file's own header — "03/08/2026 –
+   *  30/08/2026", or "4 périodes (… – …)". */
   periodLabel: string;
   generatedAt: string;
   employees: ExportEmployee[];
@@ -385,6 +395,84 @@ export type ExportPayload = {
    *  the "grand" total, showing both would just repeat the number. */
   grandTotalMinutes: number | null;
 };
+
+/**
+ * The export's period vocabulary, re-exported from the module that owns it
+ * (convex/lib/exportRange.ts) so the picker, the data query and the client
+ * all talk about the same "week".
+ */
+export type { ExportPeriodOption, ExportScale, ExportSpan } from "./lib/exportRange";
+
+/** Whom an export covers: the one employee named, or everyone on the books. */
+async function exportTargets(
+  ctx: QueryCtx,
+  admin: Doc<"users">,
+  userId: Id<"users"> | undefined,
+) {
+  const targets = userId
+    ? [await requireTarget(ctx, admin, userId)]
+    : (await ctx.db.query("users").collect()).filter(
+        (u) => u.status !== "pending" && !isHidden(u),
+      );
+  // Alphabetical, so the file lists people in the same order every month.
+  targets.sort((a, b) => (a.nom || a.email || "").localeCompare(b.nom || b.email || ""));
+  return targets;
+}
+
+/**
+ * The periods the export picker may offer, for one employee or the whole shop.
+ *
+ * Built from punches that actually exist rather than generated from the
+ * calendar, so nobody can select a week that would download an empty sheet.
+ *
+ * Each option carries its own bounds. That is what makes multi-select work
+ * without the browser ever reimplementing Monday-first weeks, month lengths or
+ * leap years: the client hands back the `from`/`to` pairs it was given.
+ *
+ * Admin only. Deliberately not plan-gated — a plan without export should see
+ * an empty picker explaining itself, not a button that throws on click.
+ */
+export const exportPeriods = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, { userId }) => {
+    const admin = await requireAdmin(ctx);
+    const allowed = planLimits().csvExport;
+
+    const worked = new Set<string>();
+    for (const user of await exportTargets(ctx, admin, userId)) {
+      const punches = await ctx.db
+        .query("badges")
+        .withIndex("by_user_at", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .take(HISTORY_LIMIT);
+      for (const punch of punches) worked.add(dayKey(punch.at));
+    }
+
+    const options = (scale: ExportScale): ExportPeriodOption[] => {
+      const counts = new Map<string, number>();
+      for (const day of worked) {
+        const key =
+          scale === "week"
+            ? mondayOf(day)
+            : scale === "month"
+              ? day.slice(0, 7)
+              : day.slice(0, 4);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      return [...counts.entries()]
+        .sort((a, b) => b[0].localeCompare(a[0])) // newest first
+        .slice(0, MAX_PERIOD_OPTIONS[scale])
+        .map(([key, days]) => ({ key, label: periodTitle(scale, key), ...periodBounds(scale, key), days }));
+    };
+
+    return {
+      allowed,
+      weeks: options("week"),
+      months: options("month"),
+      years: options("year"),
+    };
+  },
+});
 
 /**
  * The data behind the Excel export (convex/export.ts, the only place that
@@ -403,27 +491,25 @@ export type ExportPayload = {
  * directly.
  */
 export const exportData = internalQuery({
-  args: {
-    userId: v.optional(v.id("users")),
-    period: v.union(v.literal("week"), v.literal("month")),
-  },
-  handler: async (ctx, { userId, period }): Promise<ExportPayload> => {
+  args: exportArgs,
+  handler: async (ctx, { userId, period, spans }): Promise<ExportPayload> => {
     const admin = await requireAdmin(ctx);
     if (!planLimits().csvExport) {
       throw new Error("L'export n'est pas inclus dans ce forfait.");
     }
 
-    const today = dayKey(Date.now());
-    const dates = period === "week" ? weekDays(today) : daysInMonth(today.slice(0, 7));
-    const start = Date.parse(`${dates[0]}T00:00:00Z`);
-    const end = Date.parse(`${dates[dates.length - 1]}T23:59:59.999Z`);
+    const { days: wanted, label } = resolveSelection(spans, period);
+    const ordered = [...wanted].sort();
 
-    const targets = userId
-      ? [await requireTarget(ctx, admin, userId)]
-      : (await ctx.db.query("users").collect()).filter(
-          (u) => u.status !== "pending" && !isHidden(u),
-        );
-    targets.sort((a, b) => (a.nom || a.email || "").localeCompare(b.nom || b.email || ""));
+    // The index bounds are widened a day past the selection on each side.
+    // Paris midnight falls at 22:00 or 23:00 UTC, so a 00:00:00Z bound would
+    // drop punches made between local midnight and UTC midnight; the exact
+    // dayKey filter below is what actually decides, so over-fetching here is
+    // free and the boundary stops losing rows.
+    const start = Date.parse(`${addDays(ordered[0], -1)}T00:00:00Z`);
+    const end = Date.parse(`${addDays(ordered[ordered.length - 1], 1)}T23:59:59.999Z`);
+
+    const targets = await exportTargets(ctx, admin, userId);
 
     const employees: ExportEmployee[] = [];
     let grandTotal = 0;
@@ -436,11 +522,16 @@ export const exportData = internalQuery({
 
       const byWeek = new Map<string, ExportWeek>();
 
-      for (const day of groupByDay(punches).slice().reverse()) {
+      for (const day of groupByDay(punches)
+        .filter((d) => wanted.has(d.date))
+        .slice()
+        .reverse()) {
         const weekKey = mondayOf(day.date);
         const week = byWeek.get(weekKey) ?? {
           key: weekKey,
-          label: `Semaine du ${weekKey}`,
+          // Readable, not the raw key: a file spanning a dozen weeks has to be
+          // skimmable without decoding "2026-08-10" as a date first.
+          label: `Semaine du ${weekTitle(weekKey)}`,
           shifts: [],
           minutes: 0,
         };
@@ -485,8 +576,7 @@ export const exportData = internalQuery({
     }
 
     return {
-      period,
-      periodLabel: period === "week" ? `Semaine du ${dates[0]}` : dates[0].slice(0, 7),
+      periodLabel: label,
       generatedAt: `${dayKey(Date.now())} à ${timeLabel(Date.now())}`,
       employees,
       grandTotalMinutes: userId ? null : grandTotal,

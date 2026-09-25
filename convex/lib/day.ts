@@ -27,16 +27,6 @@ export function mondayOf(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** The seven "YYYY-MM-DD" of the week containing `date`, Monday first. */
-export function weekDays(date: string): string[] {
-  const monday = new Date(`${mondayOf(date)}T12:00:00Z`);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setUTCDate(d.getUTCDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
-}
-
 /** Shift the "YYYY-MM-DD" `date` by `days`. */
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T12:00:00Z`);
@@ -58,6 +48,56 @@ export function formatMinutes(total: number): string {
   const h = Math.floor(total / 60);
   const m = total % 60;
   return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Every "YYYY-MM-DD" from `from` to `to` inclusive, or [] when the range is
+ * malformed or reversed.
+ *
+ * [] rather than a throw, so the caller decides how a bad span reads to a user
+ * (convex/badges.ts refuses an export; a caller wanting the days gets none).
+ * Keys compare and sort as plain strings because they are all zero-padded ISO.
+ */
+export function spanDays(from: string, to: string): string[] {
+  const key = /^\d{4}-\d{2}-\d{2}$/;
+  if (!key.test(from) || !key.test(to) || to < from) return [];
+  const out: string[] = [];
+  // The 1000-day ceiling is a runaway guard, not a policy: the export cap in
+  // convex/badges.ts is lower, so any span reaching this was already refused
+  // and the truncation below can never be mistaken for a real result.
+  for (let day = from; day <= to && out.length < 1000; day = addDays(day, 1)) {
+    out.push(day);
+  }
+  return out;
+}
+
+/** "2026-08-03" -> "03/08/2026" — the compact stamp period labels are made of. */
+export function shortDay(date: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
+/** A Monday "2026-08-03" -> "3 août 2026" (no weekday — it is always Monday). */
+export function weekTitle(monday: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${monday}T12:00:00Z`));
+}
+
+/** "2026-08" -> "Août 2026" */
+export function monthTitle(month: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${month}-01T12:00:00Z`));
 }
 
 /** Timestamp `months` calendar months before now — the retention cutoff. */

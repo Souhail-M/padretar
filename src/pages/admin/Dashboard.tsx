@@ -216,7 +216,8 @@ export function Dashboard() {
           </h2>
           <div className="space-y-3 rounded-xl border bg-card p-4">
             <p className="text-sm text-muted-foreground">
-              Semaine ou mois en cours, tous les employés.
+              Semaine ou mois en cours, ou n'importe quelles périodes, tous
+              les employés.
             </p>
             <ExportExcelButtons />
           </div>

@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { dayKey, formatMinutes, minutesBetween, monthsAgo, parisToUtc } from "./lib/day";
+import { addDays, dayKey, formatMinutes, minutesBetween, monthsAgo, parisToUtc } from "./lib/day";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -491,6 +491,220 @@ describe("Excel export", () => {
     // A .xlsx is a zip container; every zip starts with this signature.
     expect(Buffer.from(base64, "base64").subarray(0, 2).toString("latin1")).toBe("PK");
     delete process.env.CSV_EXPORT;
+    // Writing a real workbook through exceljs inside the edge-runtime sandbox
+    // takes anywhere from 13s to over 20s depending on the machine, so the
+    // global 20s timeout is a coin flip here. The slowness is exceljs, not the
+    // query, and it is not what this test is asserting.
+  }, 120_000);
+});
+
+/** 2026-08-03, 08-10, 08-17 and 07-27 are all Mondays. */
+describe("choosing which periods to export", () => {
+  const week = (monday: string) => ({ from: monday, to: addDays(monday, 6) });
+
+  /** Eight hours on each of 2026-08-03 and 2026-08-10, nothing in between. */
+  async function twoWeeksApart() {
+    return await shopWithHistory([
+      { at: "2026-08-03T07:00:00Z", type: "in" }, // 09:00 Paris
+      { at: "2026-08-03T15:00:00Z", type: "out" }, // 17:00 Paris
+      { at: "2026-08-10T07:00:00Z", type: "in" },
+      { at: "2026-08-10T15:00:00Z", type: "out" },
+    ]);
+  }
+
+  test("exportPeriods offers only the periods that hold punches, with their bounds", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await twoWeeksApart();
+
+    const periods = await admin.query(api.badges.exportPeriods, { userId });
+    expect(periods.allowed).toBe(true);
+    // One day worked, so one week each — a period is offered for having punches,
+    // never because the calendar happened to contain it. Newest first, like the
+    // day list and the totals list it sits next to.
+    expect(periods.weeks).toEqual([
+      {
+        key: "2026-08-10",
+        label: "Semaine du 10 août 2026",
+        from: "2026-08-10",
+        to: "2026-08-16",
+        days: 1,
+      },
+      {
+        key: "2026-08-03",
+        label: "Semaine du 3 août 2026",
+        from: "2026-08-03",
+        to: "2026-08-09",
+        days: 1,
+      },
+    ]);
+    // Both fall in August, so exactly one month, and only 2026 as a year.
+    expect(periods.months.map((m) => m.key)).toEqual(["2026-08"]);
+    expect(periods.months[0]).toMatchObject({ from: "2026-08-01", to: "2026-08-31", days: 2 });
+    expect(periods.years).toEqual([
+      { key: "2026", label: "2026", from: "2026-01-01", to: "2026-12-31", days: 2 },
+    ]);
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("the bounds exportPeriods hands out are the ones that get exported", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await twoWeeksApart();
+
+    // Straight from the picker to the action, the way the dialog does it: the
+    // bounds are never recomputed in between, so the file can't be labelled
+    // with one period and filled with another.
+    const periods = await admin.query(api.badges.exportPeriods, { userId });
+    const { filename, base64 } = await admin.action(api.export.toXlsx, {
+      userId,
+      spans: periods.weeks.map(({ from, to }) => ({ from, to })),
+    });
+    // Two adjacent weeks, so one block: 03/08 to 16/08.
+    expect(filename).toBe("pointages-2026-08-03_2026-08-16.xlsx");
+    expect(Buffer.from(base64, "base64").subarray(0, 2).toString("latin1")).toBe("PK");
+    delete process.env.CSV_EXPORT;
+    // See the note on the other toXlsx test: exceljs, not the query, sets this.
+  }, 120_000);
+
+  test("adjacent periods merge into one labelled block", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await twoWeeksApart();
+
+    const payload = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [week("2026-08-03"), week("2026-08-10")],
+    });
+    expect(payload.periodLabel).toBe("03/08/2026 – 16/08/2026");
+    expect(payload.employees[0].totalMinutes).toBe(960);
+    expect(payload.employees[0].weeks.map((w) => w.key)).toEqual(["2026-08-03", "2026-08-10"]);
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a skipped period stays skipped, however busy it was", async () => {
+    process.env.CSV_EXPORT = "true";
+    // Three weeks worked; the middle one is deliberately not selected.
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-03T07:00:00Z", type: "in" },
+      { at: "2026-08-03T15:00:00Z", type: "out" },
+      { at: "2026-08-12T07:00:00Z", type: "in" }, // week of 08-10
+      { at: "2026-08-12T15:00:00Z", type: "out" },
+      { at: "2026-08-17T07:00:00Z", type: "in" }, // week of 08-17
+      { at: "2026-08-17T15:00:00Z", type: "out" },
+    ]);
+
+    const payload = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [week("2026-08-03"), week("2026-08-17")],
+    });
+    expect(payload.employees[0].weeks.map((w) => w.key)).toEqual(["2026-08-03", "2026-08-17"]);
+    expect(payload.employees[0].totalMinutes).toBe(960); // 16h, not 24h
+    // The skipped week splits the selection in two, and the header says so.
+    expect(payload.periodLabel).toBe("2 périodes (03/08/2026 – 23/08/2026)");
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a whole year, and a range crossing from July into August", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-07-27T07:00:00Z", type: "in" },
+      { at: "2026-07-27T15:00:00Z", type: "out" },
+      { at: "2026-08-03T07:00:00Z", type: "in" },
+      { at: "2026-08-03T15:00:00Z", type: "out" },
+    ]);
+
+    const year = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [{ from: "2026-01-01", to: "2026-12-31" }],
+    });
+    expect(year.employees[0].totalMinutes).toBe(960);
+    expect(year.periodLabel).toBe("01/01/2026 – 31/12/2026");
+
+    const straddling = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [{ from: "2026-07-28", to: "2026-08-16" }],
+    });
+    // The 27th is one day short of the range, so that week drops out entirely.
+    expect(straddling.employees[0].weeks.map((w) => w.key)).toEqual(["2026-08-03"]);
+    expect(straddling.employees[0].totalMinutes).toBe(480);
+
+    const both = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [{ from: "2026-07-27", to: "2026-08-16" }],
+    });
+    expect(both.employees[0].weeks.map((w) => w.key)).toEqual(["2026-07-27", "2026-08-03"]);
+    expect(both.employees[0].totalMinutes).toBe(960);
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("shifts just after Paris midnight belong to their own day, not their UTC one", async () => {
+    process.env.CSV_EXPORT = "true";
+    // Paris is UTC+2 in August, so 22:30Z on the 8th is 00:30 on the 9th, and
+    // 22:30Z on the 9th is 00:30 on the 10th. The first shift belongs to the
+    // selected week; the second does not, even though it lands on the same
+    // UTC day the selected week ends on.
+    const { admin, userId } = await shopWithHistory([
+      { at: "2026-08-08T22:30:00Z", type: "in" }, // 00:30 on 08-09
+      { at: "2026-08-09T15:00:00Z", type: "out" }, // 17:00 on 08-09
+      { at: "2026-08-09T22:30:00Z", type: "in" }, // 00:30 on 08-10
+      { at: "2026-08-10T15:00:00Z", type: "out" }, // 17:00 on 08-10
+    ]);
+
+    const payload = await admin.query(internal.badges.exportData, {
+      userId,
+      spans: [week("2026-08-03")],
+    });
+    expect(payload.employees[0].weeks).toHaveLength(1);
+    expect(payload.employees[0].weeks[0].shifts).toHaveLength(1);
+    expect(payload.employees[0].weeks[0].shifts[0]).toMatchObject({
+      date: "2026-08-09",
+      inLabel: "00:30",
+      outLabel: "17:00",
+      duration: "16h30",
+    });
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a reversed or absent range is refused rather than exporting nothing", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await twoWeeksApart();
+
+    await expect(
+      admin.query(internal.badges.exportData, {
+        userId,
+        spans: [{ from: "2026-08-10", to: "2026-08-03" }],
+      }),
+    ).rejects.toThrow(/invalide/);
+
+    // Neither a preset nor spans: an empty file with a name on it is worse
+    // than an error, so this is refused too.
+    await expect(admin.query(internal.badges.exportData, { userId })).rejects.toThrow(
+      /au moins une période/,
+    );
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a range wider than the two-year ceiling is refused", async () => {
+    process.env.CSV_EXPORT = "true";
+    const { admin, userId } = await twoWeeksApart();
+
+    await expect(
+      admin.query(internal.badges.exportData, {
+        userId,
+        spans: [{ from: "2020-01-01", to: "2026-12-31" }],
+      }),
+    ).rejects.toThrow(/deux ans/);
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("the picker is admin-only, and a plan without export gets no periods", async () => {
+    const { employee, userId } = await shopWithHistory([]);
+    await expect(employee.query(api.badges.exportPeriods, { userId })).rejects.toThrow(
+      /administrateurs/,
+    );
+
+    delete process.env.CSV_EXPORT;
+    const { admin } = await shopWithHistory([]);
+    const periods = await admin.query(api.badges.exportPeriods, {});
+    expect(periods.allowed).toBe(false);
   });
 });
 

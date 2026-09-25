@@ -5,6 +5,8 @@ import ExcelJS from "exceljs";
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { ExportPayload } from "./badges";
+import { exportArgs } from "./lib/exportArgs";
+import { filenameScope } from "./lib/exportRange";
 
 /**
  * Builds the styled payroll Excel file from convex/badges.ts `exportData`.
@@ -176,23 +178,22 @@ function formatDuration(total: number): string {
 }
 
 export const toXlsx = action({
-  args: {
-    userId: v.optional(v.id("users")),
-    period: v.union(v.literal("week"), v.literal("month")),
-  },
+  args: exportArgs,
   returns: v.object({ filename: v.string(), base64: v.string() }),
-  handler: async (ctx, { userId, period }) => {
+  handler: async (ctx, { userId, period, spans }) => {
     const payload: ExportPayload = await ctx.runQuery(internal.badges.exportData, {
       userId,
       period,
+      spans,
     });
 
     const workbook = buildWorkbook(payload);
     const buffer = await workbook.xlsx.writeBuffer();
     const base64 = Buffer.from(buffer).toString("base64");
 
-    const today = new Date().toISOString().slice(0, 10);
-    const scope = period === "week" ? "semaine" : "mois";
-    return { filename: `pointages-${scope}-${today}.xlsx`, base64 };
+    // Named after the period actually exported, not today's date: a file
+    // downloaded for last August has to say August.
+    const scope = filenameScope(spans, period);
+    return { filename: `pointages-${scope || "vide"}.xlsx`, base64 };
   },
 });

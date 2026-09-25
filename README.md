@@ -57,7 +57,7 @@ variables d'env lues par `convex/plan.ts`, posées une fois à la vente :
 |---|---|---|
 | `RETENTION_MONTHS` | Purge quotidienne des pointages plus vieux que N mois (`convex/crons.ts`) | illimité |
 | `MAX_EMPLOYEES` | Bloque `approve`/réactivation au-delà de N comptes actifs | illimité |
-| `CSV_EXPORT` | Active l'export CSV (`true` pour l'activer) | désactivé |
+| `CSV_EXPORT` | Active l'export Excel (`true` pour l'activer) | désactivé |
 
 ```bash
 npx convex env set RETENTION_MONTHS 6
@@ -65,11 +65,29 @@ npx convex env set MAX_EMPLOYEES 8
 npx convex env set CSV_EXPORT true
 ```
 
-Export CSV (bouton « Semaine/Mois (CSV) », sur le tableau de bord pour tout
-le monde, sur la fiche d'un employé pour lui seul) : une ligne par vacation
-(entrée → sortie), un total par employé, un total général sur l'export
-global. `;` en séparateur et un BOM UTF-8 pour s'ouvrir proprement dans Excel
-français, accents compris.
+Export Excel (boutons « Semaine/Mois » sur le tableau de bord pour tout le
+monde, sur la fiche d'un employé pour lui seul, plus « Autres périodes »
+n'importe où) : une ligne par vacation (entrée → sortie), un total par semaine,
+un total par employé, un total général sur l'export global.
+
+Les périodes sont au choix :
+
+- les deux raccourcis « Semaine » / « Mois », qui exportent la semaine ou le
+  mois **en cours** ;
+- « Autres périodes », qui ouvre un sélecteur : n'importe quelles semaines,
+  mois et années **d'un coup** (cases à cocher), plus une plage de dates
+  libre. Une seule passe, un seul fichier.
+
+Le sélecteur ne propose que des périodes où des pointages existent
+(`convex/badges.ts` `exportPeriods`) — impossible de télécharger une semaine
+vide par accident. Chaque proposition embarque ses propres bornes, renvoyées
+telles quelles à l'export : le navigateur ne réimplémente ni les semaines
+lundi-premier ni la longueur des mois. Résolution, fusion des périodes
+adjacentes et libellé du fichier sont partagés par les trois bouts de la
+chaîne dans `convex/lib/exportRange.ts`.
+
+Plafonds côté serveur, pour qu'une plage au doigt de travers ne tire pas tout
+l'historique : 732 jours (deux ans) et 120 périodes par export.
 
 | Commande | Rôle |
 |---|---|

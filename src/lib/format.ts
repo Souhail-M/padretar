@@ -45,3 +45,15 @@ export function timeLabel(ts: number): string {
     minute: "2-digit",
   }).format(ts);
 }
+
+/**
+ * Today in Paris as "2026-08-09" — the one the backend would call it.
+ *
+ * The browser's own `new Date().toISOString().slice(0, 10)` is UTC, which is a
+ * different day for eight hours of every evening. A date input capped at the
+ * UTC date would silently refuse today after 22:00 Paris time, so this asks
+ * the same zone the punches are stored in.
+ */
+export function todayKey(): string {
+  return new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(Date.now());
+}
