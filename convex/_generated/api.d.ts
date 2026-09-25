@@ -21,6 +21,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_day from "../lib/day.js";
 import type * as password from "../password.js";
 import type * as plan from "../plan.js";
+import type * as superadmin from "../superadmin.js";
 
 import type {
   ApiFromModules,
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   "lib/day": typeof lib_day;
   password: typeof password;
   plan: typeof plan;
+  superadmin: typeof superadmin;
 }>;
 
 /**

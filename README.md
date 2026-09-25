@@ -24,6 +24,23 @@ npx convex env set ADMIN_EMAIL "vous@example.com,autre@example.com"
 
 Tout le monde d'autre arrive en `pending` et attend une validation.
 
+## Superadmin (le développeur)
+
+Un compte `superadmin` est au-dessus des admins : il voit tout, mais
+n'apparaît nulle part (liste des employés, présence, fil d'activité, exports)
+et aucun admin ne peut l'ouvrir, le modifier, le désactiver ni changer son mot
+de passe. Il ne s'attribue que depuis la CLI, en remettant l'instance à zéro :
+
+```bash
+# ⚠️ Irréversible : supprime TOUS les autres comptes, leurs pointages,
+# sessions, identifiants et le mot de passe du kiosque.
+npx convex export --path avant-reset.zip --prod
+npx convex run superadmin:resetKeeping '{"keepEmail":"vous@example.com"}' --prod
+```
+
+Ensuite, la première inscription arrive en `pending` : le superadmin la valide
+et la passe admin, et cet admin gère tous les autres (y compris d'autres admins).
+
 Pour que le responsable puisse récupérer son mot de passe seul (voir
 « Mot de passe oublié » plus bas), une clé Resend :
 
@@ -212,6 +229,7 @@ convex/
   employees.ts   validation et fiches
   password.ts    réinitialisation (par un admin en personne, ou par email)
   ResendOTPPasswordReset.ts  code de réinitialisation envoyé par email
+  superadmin.ts  remise à zéro + compte superadmin (CLI uniquement)
   plan.ts        limites du forfait, lues depuis l'env (voir plus bas)
   crons.ts       purge quotidienne des pointages hors rétention
 src/
@@ -221,8 +239,8 @@ src/
 
 ## Volontairement absent
 
-Congés · planning · export paie ·
-notifications email · multi-boutique · correction manuelle des pointages ·
+Congés · planning ·
+notifications email · multi-boutique ·
 récapitulatif mensuel de toute l'équipe sur un seul écran (les totaux se
 lisent employé par employé) · thème clair. À rajouter seulement quand la
 boutique le demande vraiment.

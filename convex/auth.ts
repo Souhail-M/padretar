@@ -30,9 +30,20 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const email = (params.email as string | undefined)?.trim().toLowerCase();
         if (!email) throw new Error("Email requis");
 
+        // profile() also runs on signIn/reset, where only the email is sent —
+        // so the name is required at sign-up only.
+        const prenom = (params.prenom as string | undefined)?.trim() ?? "";
+        const nom = (params.nom as string | undefined)?.trim() ?? "";
+        if (params.flow === "signUp" && (!prenom || !nom)) {
+          throw new Error("Nom et prénom requis");
+        }
+
         return {
           email,
-          nom: (params.nom as string | undefined)?.trim() || undefined,
+          // ponytail: one "Prénom Nom" display field, which is what every
+          // screen and export shows; split into two columns if sorting by
+          // family name is ever asked for.
+          nom: [prenom, nom].filter(Boolean).join(" ") || undefined,
           role: "employee" as const,
           status: "pending" as const,
         };

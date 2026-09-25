@@ -38,7 +38,7 @@ function Authed() {
   if (me === null) return <Splash />;
   if (me.status !== "active") return <Pending status={me.status} />;
 
-  const isAdmin = me.role === "admin";
+  const isAdmin = me.role === "admin" || me.role === "superadmin";
 
   // While the kiosk is locked nothing else renders, whatever the URL says.
   // Guarding only the kiosk's own close button would achieve nothing: the

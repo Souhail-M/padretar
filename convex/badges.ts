@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
-import { requireActive, requireAdmin } from "./lib/auth";
+import { isHidden, requireActive, requireAdmin, requireTarget } from "./lib/auth";
 import {
   dayKey,
   daysInMonth,
@@ -108,7 +108,8 @@ export const addPunch = mutation({
   args: { userId: v.id("users"), date: v.string(), time: v.string(), type: punchEnum },
   returns: v.null(),
   handler: async (ctx, { userId, date, time, type }) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
+    await requireTarget(ctx, admin, userId);
     await ctx.db.insert("badges", { userId, at: parisToUtc(date, time), type });
     return null;
   },
@@ -243,7 +244,8 @@ export const mine = query({
 export const forEmployee = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
+    await requireTarget(ctx, admin, userId);
     const punches = await ctx.db
       .query("badges")
       .withIndex("by_user_at", (q) => q.eq("userId", userId))
@@ -272,7 +274,7 @@ export const whoIsIn = query({
     const employees = await ctx.db.query("users").collect();
     const rows = await Promise.all(
       employees
-        .filter((u) => u.status === "active")
+        .filter((u) => u.status === "active" && !isHidden(u))
         .map(async (u) => {
           const last = await lastPunch(ctx, u._id);
           const inside = isIn(last, now);
@@ -318,13 +320,15 @@ export const recentActivity = query({
       .order("desc")
       .take(limit ?? 40);
 
-    const names = new Map<string, string>();
-    return await Promise.all(
+    const names = new Map<string, string | null>();
+    const rows = await Promise.all(
       punches.map(async (p) => {
         if (!names.has(p.userId)) {
           const u = await ctx.db.get(p.userId);
-          names.set(p.userId, u?.nom ?? u?.email ?? "—");
+          // null = hidden (superadmin): dropped below.
+          names.set(p.userId, isHidden(u) ? null : (u?.nom ?? u?.email ?? "—"));
         }
+        if (names.get(p.userId) === null) return null;
         return {
           _id: p._id,
           userId: p.userId,
@@ -336,6 +340,7 @@ export const recentActivity = query({
         };
       }),
     );
+    return rows.filter((r) => r !== null);
   },
 });
 
@@ -403,7 +408,7 @@ export const exportData = internalQuery({
     period: v.union(v.literal("week"), v.literal("month")),
   },
   handler: async (ctx, { userId, period }): Promise<ExportPayload> => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
     if (!planLimits().csvExport) {
       throw new Error("L'export n'est pas inclus dans ce forfait.");
     }
@@ -414,8 +419,10 @@ export const exportData = internalQuery({
     const end = Date.parse(`${dates[dates.length - 1]}T23:59:59.999Z`);
 
     const targets = userId
-      ? [await ctx.db.get(userId)].filter((u): u is Doc<"users"> => u !== null)
-      : (await ctx.db.query("users").collect()).filter((u) => u.status !== "pending");
+      ? [await requireTarget(ctx, admin, userId)]
+      : (await ctx.db.query("users").collect()).filter(
+          (u) => u.status !== "pending" && !isHidden(u),
+        );
     targets.sort((a, b) => (a.nom || a.email || "").localeCompare(b.nom || b.email || ""));
 
     const employees: ExportEmployee[] = [];

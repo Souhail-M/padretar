@@ -2,7 +2,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, describe, expect, test } from "vitest";
 
 import schema from "./schema";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -40,7 +40,7 @@ type Params = Record<string, string>;
 const signUp = (t: Shop, params: Params) =>
   t.action(api.auth.signIn, {
     provider: "password",
-    params: { flow: "signUp", ...params },
+    params: { flow: "signUp", prenom: "Test", nom: "Test", ...params },
   });
 
 const signIn = (t: Shop, params: Params) =>
@@ -78,13 +78,14 @@ describe("account creation", () => {
     await signUp(t, {
       email: "employe@example.com",
       password: "motdepasse",
+      prenom: "Karim",
       nom: "Employé",
     });
 
     const user = (await users(t)).find((u) => u._id !== adminId)!;
     expect(user).toMatchObject({
       email: "employe@example.com",
-      nom: "Employé",
+      nom: "Karim Employé",
       role: "employee",
       status: "pending",
     });
@@ -102,12 +103,24 @@ describe("account creation", () => {
     await signUp(t, {
       email: "  Employe@Example.COM  ",
       password: "motdepasse",
+      prenom: "  Karim ",
       nom: "  Employé  ",
     });
 
     const [user] = await users(t);
     expect(user.email).toBe("employe@example.com");
-    expect(user.nom).toBe("Employé");
+    expect(user.nom).toBe("Karim Employé");
+  });
+
+  test("sign-up without a first or last name is refused", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      signUp(t, { email: "a@example.com", password: "motdepasse", prenom: " " }),
+    ).rejects.toThrow(/Nom et prénom/);
+    await expect(
+      signUp(t, { email: "a@example.com", password: "motdepasse", nom: "" }),
+    ).rejects.toThrow(/Nom et prénom/);
+    expect(await users(t)).toHaveLength(0);
   });
 
   test("the ADMIN_EMAIL sign-up bootstraps an active admin, whatever its casing", async () => {
@@ -334,5 +347,48 @@ describe("admin validation", () => {
     await expect(
       employee.mutation(api.employees.approve, { userId }),
     ).rejects.toThrow(/en attente/);
+  });
+});
+
+describe("superadmin", () => {
+  test("reset keeps one account as a hidden superadmin who hands the shop a first admin", async () => {
+    const { t, adminId } = await shopWithAdmin();
+    await signUp(t, { email: "employe@example.com", password: "motdepasse" });
+    await signUp(t, { email: "moi@example.com", password: "motdepasse" });
+
+    await expect(
+      t.mutation(internal.superadmin.resetKeeping, { keepEmail: "absent@example.com" }),
+    ).rejects.toThrow(/Aucun compte/);
+
+    const result = await t.mutation(internal.superadmin.resetKeeping, {
+      keepEmail: " MOI@example.com ",
+    });
+    expect(result.deletedUsers).toBe(2);
+    const [me] = await users(t);
+    expect(me).toMatchObject({ email: "moi@example.com", role: "superadmin", status: "active" });
+    expect(await t.run(async (ctx) => await ctx.db.get(adminId))).toBeNull();
+
+    // A new sign-up is not "first ever" any more: it waits for the superadmin.
+    delete process.env.ADMIN_EMAIL;
+    await signUp(t, { email: "patron2@example.com", password: "motdepasse" });
+    const patron = (await users(t)).find((u) => u.email === "patron2@example.com")!;
+    expect(patron.status).toBe("pending");
+
+    const su = t.withIdentity({ subject: `${me._id}|session` });
+    await su.mutation(api.employees.approve, { userId: patron._id });
+    await su.mutation(api.employees.update, { userId: patron._id, role: "admin" });
+
+    // The new admin sees nobody above them and can't touch the superadmin.
+    const admin = t.withIdentity({ subject: `${patron._id}|session` });
+    const list = await admin.query(api.employees.list, {});
+    expect(list.map((u) => u.email)).toEqual(["patron2@example.com"]);
+    expect((await admin.query(api.badges.whoIsIn, {})).map((r) => r.userId)).toEqual([patron._id]);
+    await expect(admin.query(api.employees.get, { userId: me._id })).rejects.toThrow(/introuvable/);
+    await expect(
+      admin.mutation(api.employees.setStatus, { userId: me._id, status: "disabled" }),
+    ).rejects.toThrow(/introuvable/);
+    await expect(
+      admin.mutation(api.employees.update, { userId: me._id, role: "employee" }),
+    ).rejects.toThrow(/introuvable/);
   });
 });

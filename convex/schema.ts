@@ -4,6 +4,10 @@ import { v } from "convex/values";
 
 export const roleEnum = v.union(v.literal("employee"), v.literal("admin"));
 
+/** roleEnum plus the developer's own account: above admin, invisible to the
+ *  shop. Never assignable from the app — only convex/superadmin.ts sets it. */
+export const storedRoleEnum = v.union(roleEnum, v.literal("superadmin"));
+
 export const statusEnum = v.union(
   v.literal("pending"),
   v.literal("active"),
@@ -27,7 +31,7 @@ export default defineSchema({
     // Padretar fields:
     nom: v.optional(v.string()),
     poste: v.optional(v.string()),
-    role: roleEnum,
+    role: storedRoleEnum,
     status: statusEnum,
   })
     .index("by_email", ["email"])

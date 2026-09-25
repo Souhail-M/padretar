@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { roleEnum } from "./schema";
-import { requireAdmin } from "./lib/auth";
+import { isHidden, requireAdmin, requireTarget } from "./lib/auth";
 import { planLimits } from "./plan";
 
 /** Throws once the plan's employee cap (convex/plan.ts) is already reached. */
@@ -15,7 +15,7 @@ async function assertRoomForOneMore(ctx: MutationCtx) {
       .query("users")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect()
-  ).length;
+  ).filter((u) => !isHidden(u)).length;
   if (activeCount >= maxEmployees) {
     throw new Error(`Limite de ${maxEmployees} employés atteinte pour ce forfait.`);
   }
@@ -26,7 +26,7 @@ export const list = query({
   args: {},
   handler: async (ctx) => {
     await requireAdmin(ctx);
-    const users = await ctx.db.query("users").collect();
+    const users = (await ctx.db.query("users").collect()).filter((u) => !isHidden(u));
 
     const rank = { pending: 0, active: 1, disabled: 2 } as const;
     return users
@@ -49,8 +49,8 @@ export const list = query({
 export const get = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    await requireAdmin(ctx);
-    return await ctx.db.get(userId);
+    const admin = await requireAdmin(ctx);
+    return await requireTarget(ctx, admin, userId);
   },
 });
 
@@ -59,7 +59,8 @@ export const approve = mutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, { userId }) => {
-    await requireAdmin(ctx);
+    const admin = await requireAdmin(ctx);
+    await requireTarget(ctx, admin, userId);
     await assertRoomForOneMore(ctx);
     await ctx.db.patch(userId, { status: "active" });
     return null;
@@ -78,6 +79,7 @@ export const setStatus = mutation({
   returns: v.null(),
   handler: async (ctx, { userId, status }) => {
     const admin = await requireAdmin(ctx);
+    await requireTarget(ctx, admin, userId);
     if (admin._id === userId && status === "disabled") {
       throw new Error("Vous ne pouvez pas désactiver votre propre compte");
     }
@@ -97,6 +99,11 @@ export const update = mutation({
   returns: v.null(),
   handler: async (ctx, { userId, ...fields }) => {
     const admin = await requireAdmin(ctx);
+    const target = await requireTarget(ctx, admin, userId);
+    // The superadmin's role is set from the CLI only (convex/superadmin.ts).
+    if (isHidden(target) && fields.role) {
+      throw new Error("Rôle non modifiable");
+    }
     if (admin._id === userId && fields.role === "employee") {
       throw new Error("Vous ne pouvez pas retirer votre propre rôle admin");
     }

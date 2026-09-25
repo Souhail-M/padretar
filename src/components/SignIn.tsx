@@ -57,9 +57,15 @@ export function SignIn() {
 
       <form onSubmit={onSubmit} className="w-full max-w-xs space-y-4">
         {flow === "signUp" && (
-          <div className="space-y-2">
-            <Label htmlFor="nom">Nom</Label>
-            <Input id="nom" name="nom" autoComplete="name" required />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="prenom">Prénom</Label>
+              <Input id="prenom" name="prenom" autoComplete="given-name" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nom">Nom</Label>
+              <Input id="nom" name="nom" autoComplete="family-name" required />
+            </div>
           </div>
         )}
 

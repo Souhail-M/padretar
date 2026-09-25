@@ -6,7 +6,7 @@ import {
 import { action, internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
-import { requireAdmin } from "./lib/auth";
+import { requireAdmin, requireTarget } from "./lib/auth";
 
 /**
  * Forgotten passwords.
@@ -41,9 +41,9 @@ export const emailOf = internalQuery({
   args: { userId: v.id("users") },
   returns: v.string(),
   handler: async (ctx, { userId }) => {
-    await requireAdmin(ctx);
-    const user = await ctx.db.get(userId);
-    if (!user?.email) throw new Error("Employé introuvable");
+    const admin = await requireAdmin(ctx);
+    const user = await requireTarget(ctx, admin, userId);
+    if (!user.email) throw new Error("Employé introuvable");
     return user.email;
   },
 });

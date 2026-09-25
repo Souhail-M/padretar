@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
 /**
  * The current user, guaranteed signed in and approved.
@@ -25,11 +25,36 @@ export async function requireActive(
   return user;
 }
 
-/** As requireActive, and the user must be an admin. */
+/** As requireActive, and the user must be an admin (or the superadmin). */
 export async function requireAdmin(
   ctx: QueryCtx | MutationCtx,
 ): Promise<Doc<"users">> {
   const user = await requireActive(ctx);
-  if (user.role !== "admin") throw new Error("Réservé aux administrateurs");
+  if (user.role !== "admin" && user.role !== "superadmin") {
+    throw new Error("Réservé aux administrateurs");
+  }
   return user;
+}
+
+/**
+ * The superadmin sees everything and is seen nowhere: every list, presence
+ * board and export filters it out with this, and admins can't open, edit,
+ * disable or reset it (see requireTarget).
+ */
+export const isHidden = (user: Doc<"users"> | null) => user?.role === "superadmin";
+
+/**
+ * The user an admin is acting on. The superadmin answers "introuvable" to
+ * everyone but itself — same error as a wrong id, so its existence doesn't leak.
+ */
+export async function requireTarget(
+  ctx: QueryCtx | MutationCtx,
+  caller: Doc<"users">,
+  userId: Id<"users">,
+): Promise<Doc<"users">> {
+  const target = await ctx.db.get(userId);
+  if (!target || (isHidden(target) && caller.role !== "superadmin")) {
+    throw new Error("Utilisateur introuvable");
+  }
+  return target;
 }

@@ -6,5 +6,8 @@ export default defineConfig({
     environment: "edge-runtime",
     server: { deps: { inline: ["convex-test"] } },
     include: ["convex/**/*.test.ts"],
+    // Each real sign-up hashes a password (Scrypt); a test doing four of them
+    // brushes the 5s default on a loaded machine.
+    testTimeout: 20_000,
   },
 });
