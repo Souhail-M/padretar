@@ -706,6 +706,47 @@ describe("choosing which periods to export", () => {
     const periods = await admin.query(api.badges.exportPeriods, {});
     expect(periods.allowed).toBe(false);
   });
+
+  test("the shop-wide picker stays affordable with a full staff and long history", async () => {
+    process.env.CSV_EXPORT = "true";
+    const t = convexTest(schema, modules);
+
+    // 12 employees x 700 punches = 8,400 reads wanted, past the 8,000 budget.
+    // Before the budget existed this multiplied the per-person history by the
+    // headcount and blew Convex's 16k document-read ceiling on a real
+    // deployment — a hard server error, not a degraded list.
+    const { adminId } = await t.run(async (ctx) => {
+      const adminId = await ctx.db.insert("users", {
+        email: "patron@example.com",
+        role: "admin",
+        status: "active",
+      });
+      for (let n = 0; n < 12; n++) {
+        const userId = await ctx.db.insert("users", {
+          email: `employe${n}@example.com`,
+          role: "employee",
+          status: "active",
+        });
+        for (let d = 0; d < 350; d++) {
+          const at = Date.parse(`2026-01-05T08:00:00Z`) + d * 86_400_000;
+          await ctx.db.insert("badges", { userId, at, type: "in" });
+          await ctx.db.insert("badges", { userId, at: at + 8 * 3_600_000, type: "out" });
+        }
+      }
+      return { adminId };
+    });
+
+    const admin = t.withIdentity({ subject: `${adminId}|session` });
+    const periods = await admin.query(api.badges.exportPeriods, {});
+
+    // It answers, and it answers about the periods that exist rather than
+    // erroring out or inventing them.
+    expect(periods.weeks.length).toBeGreaterThan(0);
+    expect(periods.weeks.length).toBeLessThanOrEqual(60);
+    expect(periods.weeks[0].key <= "2026-12-28").toBe(true);
+    expect(periods.months.map((m) => m.key)).toContain("2026-01");
+    delete process.env.CSV_EXPORT;
+  });
 });
 
 describe("day helpers", () => {

@@ -30,6 +30,26 @@ import { punchEnum } from "./schema";
 const HISTORY_LIMIT = 800;
 
 /**
+ * How many punches exportPeriods may read in total, across every employee.
+ *
+ * The picker asks the same question for one employee or for the whole shop, and
+ * the shop-wide case used to multiply HISTORY_LIMIT by the headcount — the
+ * heaviest read in the app by a wide margin, on a query that only needs to know
+ * *which* days have punches, not what happened on them. Convex caps a single
+ * query at 16k document reads, so that version failed outright once the shop
+ * grew past ~20 employees.
+ *
+ * One budget for the whole query, spent in the same order the targets are
+ * listed, so the cost is bounded no matter how many people are on the books.
+ * Running out truncates the oldest periods off the list rather than throwing:
+ * the options are already capped at 60 weeks / 36 months / 10 years, newest
+ * first, and `days` is a hint beside a label rather than a total anyone pays
+ * from. What this must never become is a silent wrong answer — hence the cap is
+ * generous enough that reaching it is a deliberate signal, not routine.
+ */
+const EXPORT_PERIOD_READ_BUDGET = 8_000;
+
+/**
  * Two punches this close together are the same gesture, not two.
  *
  * The camera decodes the same QR several times a second, so one scan can
@@ -431,6 +451,9 @@ async function exportTargets(
  *
  * Admin only. Deliberately not plan-gated — a plan without export should see
  * an empty picker explaining itself, not a button that throws on click.
+ *
+ * Reads are bounded by EXPORT_PERIOD_READ_BUDGET across all employees, so the
+ * shop-wide picker costs about what the single-employee one does.
  */
 export const exportPeriods = query({
   args: { userId: v.optional(v.id("users")) },
@@ -439,12 +462,15 @@ export const exportPeriods = query({
     const allowed = planLimits().csvExport;
 
     const worked = new Set<string>();
+    let budget = EXPORT_PERIOD_READ_BUDGET;
     for (const user of await exportTargets(ctx, admin, userId)) {
+      if (budget <= 0) break;
       const punches = await ctx.db
         .query("badges")
         .withIndex("by_user_at", (q) => q.eq("userId", user._id))
         .order("desc")
-        .take(HISTORY_LIMIT);
+        .take(Math.min(HISTORY_LIMIT, budget));
+      budget -= punches.length;
       for (const punch of punches) worked.add(dayKey(punch.at));
     }
 
