@@ -3,29 +3,22 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 
 import { Wordmark } from "./Wordmark";
-import { ForgotPassword } from "./ForgotPassword";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/**
+ * Sign in, or sign up. There is no "forgot password" link here on purpose:
+ * a shop shares a room, so the way back in is the responsable resetting the
+ * password from the employee's fiche, and the responsable's own is the CLI
+ * break-glass (convex/password.ts). A link that couldn't have worked — the
+ * emailed-code flow is gone — would only be a dead end to promise otherwise.
+ */
 export function SignIn() {
   const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [forgot, setForgot] = useState(false);
-
-  if (forgot) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
-        <Wordmark className="mb-2 text-2xl" />
-        <p className="mb-10 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Padretar
-        </p>
-        <ForgotPassword onCancel={() => setForgot(false)} onSuccess={() => setForgot(false)} />
-      </div>
-    );
-  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,23 +97,12 @@ export function SignIn() {
           onClick={() => {
             setFlow(flow === "signIn" ? "signUp" : "signIn");
             setError(null);
-            setForgot(false);
           }}
         >
           {flow === "signIn"
             ? "Pas encore de compte ? En créer un"
             : "J'ai déjà un compte"}
         </button>
-
-        {flow === "signIn" && (
-          <button
-            type="button"
-            className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-            onClick={() => setForgot(true)}
-          >
-            Mot de passe oublié ?
-          </button>
-        )}
       </form>
     </div>
   );

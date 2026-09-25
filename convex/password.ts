@@ -11,15 +11,15 @@ import { requireAdmin, requireTarget } from "./lib/auth";
 /**
  * Forgotten passwords.
  *
- * An employee and the responsable usually stand in the same room, so the
- * in-person path stays the fast default: the responsable resets it from the
- * employee's fiche and says the new password out loud.
+ * One door, on purpose: the in-person reset. An employee and the responsable
+ * stand in the same room, so the responsable resets it from the employee's
+ * fiche and says the new password out loud.
  *
- * The responsable's own password is the one case that has nobody above it —
- * that one now goes through the emailed-code flow instead (`reset` on the
- * Password provider in convex/auth.ts, via convex/ResendOTPPasswordReset.ts).
- * `resetByEmail` below stays only as a break-glass fallback for when Resend
- * itself is down or misconfigured.
+ * There is no emailed self-service reset, so the responsable's own password is
+ * the one case with nobody above them — `resetByEmail` below is the only way
+ * back in for it, run from a terminal that already holds the deployment's
+ * admin key. See convex/auth.ts for why the Password provider's `reset` is left
+ * unset.
  */
 
 /** The rule the Password provider applies on sign-up; a reset must not be a way around it. */
@@ -71,9 +71,8 @@ export const resetForEmployee = action({
 });
 
 /**
- * Break-glass fallback for an admin locked out of their own account, for
- * when the emailed-code reset can't be used (Resend down, AUTH_RESEND_KEY
- * missing, etc). Normal recovery is self-service — see the module docstring.
+ * The way back in for the responsable locked out of their own account, since
+ * nobody can reset it for them and there is no email to fall back on.
  *
  *   npx convex run password:resetByEmail '{"email":"vous@example.com","password":"…"}'
  *   npx convex run password:resetByEmail '{...}' --prod    # production
@@ -81,6 +80,10 @@ export const resetForEmployee = action({
  * `internalAction` is unreachable from the browser: only the CLI and the
  * Convex dashboard can call it, and both already hold the deployment's admin
  * key. That key is the credential here — there is no second door to guard.
+ *
+ * Practical consequence worth stating plainly: this requires shell access to
+ * the deployment. Losing the responsable's password without it means the shop
+ * has no way in through the app, and recovery starts from the Convex dashboard.
  */
 export const resetByEmail = internalAction({
   args: { email: v.string(), password: v.string() },

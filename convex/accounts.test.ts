@@ -133,6 +133,30 @@ describe("account creation", () => {
     expect(user).toMatchObject({ role: "admin", status: "active" });
   });
 
+  test("the password-reset flow is refused outright, not merely unlinked", async () => {
+    delete process.env.ADMIN_EMAIL;
+    const t = convexTest(schema, modules);
+    await signUp(t, { email: "patron@example.com", password: "motdepasse" });
+
+    // The emailed self-service reset is gone (convex/auth.ts sets no `reset`),
+    // so the flow has no server to talk to. Hidden UI is not the guarantee —
+    // a hand-built request has to fail the same way the button is gone, or
+    // "there's no reset link" would just mean nobody looked.
+    await expect(
+      t.action(api.auth.signIn, {
+        provider: "password",
+        params: { flow: "reset", email: "patron@example.com" },
+      }),
+    ).rejects.toThrow(/reset is not enabled/i);
+
+    // And the account itself is untouched by the attempt.
+    const [user] = await users(t);
+    expect(user.email).toBe("patron@example.com");
+    await expect(
+      signIn(t, { email: "patron@example.com", password: "motdepasse" }),
+    ).resolves.toBeTruthy();
+  });
+
   test("the very first sign-up ever becomes an active admin, no ADMIN_EMAIL needed", async () => {
     delete process.env.ADMIN_EMAIL;
     const t = convexTest(schema, modules);

@@ -2,7 +2,6 @@ import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { query } from "./_generated/server";
 import type { DataModel } from "./_generated/dataModel";
-import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
 
 /** Comma-separated allowlist from the ADMIN_EMAIL env var, lowercased. */
 function bootstrapAdminEmails(): string[] {
@@ -48,7 +47,12 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           status: "pending" as const,
         };
       },
-      reset: ResendOTPPasswordReset,
+      // No `reset`: there is deliberately no emailed self-service reset.
+      // Everyone in a single shop shares a room, so an admin resets a forgotten
+      // password in person from the employee's fiche (`password:resetForEmployee`),
+      // and the responsable's own is the CLI break-glass `password:resetByEmail`.
+      // Leaving this unset also means the `reset` auth flow has no server to
+      // talk to, so it cannot be reached even by a hand-built request.
     }),
   ],
   callbacks: {

@@ -4,7 +4,6 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 
 import { api } from "../../convex/_generated/api";
-import { ForgotPassword } from "@/components/ForgotPassword";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,9 +27,11 @@ import {
  *
  * The account password always works, dedicated one set or not: it already
  * outranks the kiosk secret security-wise, so there is no reason to lock a
- * forgotten dedicated password out of it. And it alone has a real recovery
- * path — the emailed-code reset (ForgotPassword) — for the person standing
- * at an unattended tablet with no devtools and nobody to call.
+ * forgotten dedicated password out of it. That is also the whole recovery path
+ * for someone standing at an unattended tablet with no devtools: the toggle
+ * below. Forgetting the account password too means an admin resetting it, or
+ * clearing the dedicated one from the dashboard so only the account is asked
+ * for — there is no emailed fallback to offer.
  *
  * A wrong secret throws and the kiosk stays put.
  */
@@ -57,14 +58,12 @@ export function KioskUnlockDialog({
   const [busy, setBusy] = useState(false);
   // Switched on to bypass a forgotten dedicated password.
   const [useAccount, setUseAccount] = useState(false);
-  const [forgot, setForgot] = useState(false);
   const askingForAccount = useAccount || !dedicated;
 
   function resetLocal() {
     setPassword("");
     setError(null);
     setUseAccount(false);
-    setForgot(false);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -106,94 +105,63 @@ export function KioskUnlockDialog({
       }}
     >
       <DialogContent className="sm:max-w-xs">
-        {forgot ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Mot de passe oublié</DialogTitle>
-              <DialogDescription>
-                Un code sera envoyé à {me?.email}. Il vous reconnecte et vous
-                fait sortir du kiosque.
-              </DialogDescription>
-            </DialogHeader>
-            <ForgotPassword
-              onCancel={() => setForgot(false)}
-              onSuccess={() => {
-                resetLocal();
-                onOpenChange(false);
-                onUnlocked();
-              }}
+        <DialogHeader>
+          <DialogTitle>Quitter le kiosque</DialogTitle>
+          <DialogDescription>
+            {exitState === undefined
+              ? "Cet écran est ouvert en boutique. Un mot de passe est demandé pour en sortir."
+              : askingForAccount
+                ? "Cet écran est ouvert en boutique. Le mot de passe du compte responsable est demandé pour en sortir."
+                : "Cet écran est ouvert en boutique. Saisissez le mot de passe de sortie du kiosque."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={(e) => void submit(e)} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="kiosk-password">
+              {askingForAccount
+                ? `Mot de passe ${me?.email ? `de ${me.email}` : ""}`
+                : "Mot de passe de sortie"}
+            </Label>
+            <Input
+              id="kiosk-password"
+              type="password"
+              autoComplete={askingForAccount ? "current-password" : "off"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoFocus
+              required
             />
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>Quitter le kiosque</DialogTitle>
-              <DialogDescription>
-                {exitState === undefined
-                  ? "Cet écran est ouvert en boutique. Un mot de passe est demandé pour en sortir."
-                  : askingForAccount
-                    ? "Cet écran est ouvert en boutique. Le mot de passe du compte responsable est demandé pour en sortir."
-                    : "Cet écran est ouvert en boutique. Saisissez le mot de passe de sortie du kiosque."}
-              </DialogDescription>
-            </DialogHeader>
+          </div>
 
-            <form onSubmit={(e) => void submit(e)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="kiosk-password">
-                  {askingForAccount
-                    ? `Mot de passe ${me?.email ? `de ${me.email}` : ""}`
-                    : "Mot de passe de sortie"}
-                </Label>
-                <Input
-                  id="kiosk-password"
-                  type="password"
-                  autoComplete={askingForAccount ? "current-password" : "off"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoFocus
-                  required
-                />
-              </div>
+          {error && <p className="text-sm text-exit">{error}</p>}
 
-              {error && <p className="text-sm text-exit">{error}</p>}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={busy || !password || exitState === undefined}
+          >
+            {busy && <Loader2 className="animate-spin" />}
+            Déverrouiller
+          </Button>
+        </form>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={busy || !password || exitState === undefined}
-              >
-                {busy && <Loader2 className="animate-spin" />}
-                Déverrouiller
-              </Button>
-            </form>
-
-            <div className="flex flex-col gap-1 pt-1 text-center text-sm">
-              {dedicated && !useAccount && (
-                <button
-                  type="button"
-                  className="text-muted-foreground underline-offset-4 hover:underline"
-                  onClick={() => {
-                    setUseAccount(true);
-                    setPassword("");
-                    setError(null);
-                  }}
-                >
-                  Mot de passe de sortie oublié ? Utiliser le mot de passe du
-                  compte
-                </button>
-              )}
-              {askingForAccount && (
-                <button
-                  type="button"
-                  className="text-muted-foreground underline-offset-4 hover:underline"
-                  onClick={() => setForgot(true)}
-                >
-                  Mot de passe oublié ?
-                </button>
-              )}
-            </div>
-          </>
-        )}
+        <div className="flex flex-col gap-1 pt-1 text-center text-sm">
+          {dedicated && !useAccount && (
+            <button
+              type="button"
+              className="text-muted-foreground underline-offset-4 hover:underline"
+              onClick={() => {
+                setUseAccount(true);
+                setPassword("");
+                setError(null);
+              }}
+            >
+              Mot de passe de sortie oublié ? Utiliser le mot de passe du
+              compte
+            </button>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -162,9 +162,8 @@ export function EmployeeDetail() {
           <p className="text-sm text-muted-foreground">
             Aucun email n'est envoyé ici : vous donnez le nouveau mot de passe
             à l'employé, qui le change ensuite s'il le souhaite. Ses sessions
-            ouvertes sont fermées. L'employé peut aussi se débrouiller seul
-            avec « Mot de passe oublié ? » sur l'écran de connexion, qui lui
-            envoie un code par email.
+            ouvertes sont fermées. C'est la seule façon de récupérer un mot de
+            passe oublié — l'écran de connexion n'en propose aucune autre.
           </p>
         </section>
       </div>

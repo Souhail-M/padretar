@@ -1,6 +1,6 @@
 /**
  * Per-deployment limits, read from env vars set once at onboarding — same
- * tier as ADMIN_EMAIL/AUTH_RESEND_KEY. There is no plan table: one Convex
+ * tier as ADMIN_EMAIL. There is no plan table: one Convex
  * project per client (see the pricing notes), so there is nothing to look up
  * and nothing for a client to change themselves.
  */

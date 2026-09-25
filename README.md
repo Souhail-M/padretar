@@ -41,12 +41,8 @@ npx convex run superadmin:resetKeeping '{"keepEmail":"vous@example.com"}' --prod
 Ensuite, la première inscription arrive en `pending` : le superadmin la valide
 et la passe admin, et cet admin gère tous les autres (y compris d'autres admins).
 
-Pour que le responsable puisse récupérer son mot de passe seul (voir
-« Mot de passe oublié » plus bas), une clé Resend :
-
-```bash
-npx convex env set AUTH_RESEND_KEY re_xxxxxxxx
-```
+Il n'y a pas de réinitialisation par email : voir « Mot de passe oublié » plus
+bas.
 
 ## Forfait (limites par client)
 
@@ -121,22 +117,27 @@ vacation en silence.
 
 ## Mot de passe oublié
 
-- **Un employé** : le plus rapide reste le responsable — il ouvre sa fiche,
-  saisit un nouveau mot de passe (8 caractères minimum) et le lui donne de
-  vive voix. Les sessions ouvertes de cet employé sont fermées. L'employé
-  peut aussi utiliser le lien « Mot de passe oublié ? » ci-dessous s'il
-  préfère ne pas déranger le responsable.
-- **Le responsable lui-même** : personne au-dessus de lui, donc c'est un code
-  reçu par email (« Mot de passe oublié ? » sur l'écran de connexion) —
-  autonome, aucune intervention du développeur nécessaire. Nécessite
-  `AUTH_RESEND_KEY` (voir tableau des variables plus bas).
+Il n'y a **qu'une seule porte**, et c'est le responsable qui l'ouvre : tout le
+monde partage la même pièce, donc.reset en personne vaut plus qu'un email.
 
-Filet de sécurité si Resend est en panne ou mal configuré : la fonction CLI
-`resetByEmail`, injoignable depuis le navigateur.
+- **Un employé** : le responsable ouvre sa fiche, saisit un nouveau mot de
+  passe (8 caractères minimum) et le lui donne de vive voix. Les sessions
+  ouvertes de cet employé sont fermées.
+- **Le responsable lui-même** : personne au-dessus de lui. Il n'y a pas
+  d'auto-service par email — la fonction `resetByEmail` ci-dessous est le
+  seul moyen d'y revenir, et elle demande un accès shell au déploiement.
+
+Il n'y a volontairement aucune réinitialisation par email : le flux `reset` du
+provider Password n'est pas configuré, donc l'endpoint d'authentification le
+refuse (*"Password reset is not enabled"*) au lieu d'envoyer quoi que ce soit.
+Masquer le lien ne suffirait pas — c'est le serveur qui refuse.
 
 ```bash
 npx convex run password:resetByEmail '{"email":"vous@example.com","password":"…"}' --prod
 ```
+
+À garder en tête : perdre le mot de passe du responsable **sans** accès à la
+Convex dashboard, c'est une boutique qui n'a plus d'entrée par l'application.
 
 ## Déploiement
 
@@ -151,9 +152,10 @@ statiques.
 | dev | `https://groovy-hare-598.eu-west-1.convex.cloud` |
 | **prod** | `https://hardy-dragon-575.eu-west-1.convex.cloud` |
 
-Les deux ont leurs propres `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`,
-`ADMIN_EMAIL` (optionnel) et `AUTH_RESEND_KEY` — les clés d'un déploiement ne
-valent jamais pour l'autre.
+Les deux ont leurs propres `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL` et
+`ADMIN_EMAIL` (optionnel) - les clés d'un déploiement ne valent jamais pour
+l'autre.
+
 
 ```bash
 npx convex deploy            # pousse les fonctions en production
@@ -245,8 +247,7 @@ convex/
   badges.ts      punch, historique, présence, totaux semaine/mois
   kiosk.ts       code tournant
   employees.ts   validation et fiches
-  password.ts    réinitialisation (par un admin en personne, ou par email)
-  ResendOTPPasswordReset.ts  code de réinitialisation envoyé par email
+  password.ts    réinitialisation (par un admin en personne, ou CLI en dernier recours)
   superadmin.ts  remise à zéro + compte superadmin (CLI uniquement)
   plan.ts        limites du forfait, lues depuis l'env (voir plus bas)
   crons.ts       purge quotidienne des pointages hors rétention
