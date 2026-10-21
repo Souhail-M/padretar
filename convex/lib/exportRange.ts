@@ -17,8 +17,10 @@ import {
   daysInMonth,
   mondayOf,
   monthTitle,
+  monthsAgo,
   shortDay,
   spanDays,
+  spanLength,
   weekTitle,
 } from "./day";
 
@@ -41,11 +43,52 @@ export type ExportPeriodOption = {
 };
 
 /**
- * How far one export may reach. Two years is a file a shop can still open and
- * comfortably covers the retention window plans sell; the ceiling also stops a
- * fat-fingered custom range from pulling every punch ever kept.
+ * How far one export may reach, and why — a ceiling the picker can explain
+ * before the click and the server can enforce without re-describing.
+ */
+export type ExportCap = {
+  /** The most calendar days one selection may cover. */
+  days: number;
+  /** Why that is the number, in a phrase that fits in parentheses: "deux ans",
+   *  "12 mois de pointages". */
+  reason: string;
+};
+
+/**
+ * How far one export may reach when the plan sets no retention window. Two
+ * years is a file a shop can still open; the ceiling also stops a fat-fingered
+ * custom range from pulling every punch ever kept.
  */
 export const MAX_EXPORT_DAYS = 732;
+
+/** The ceiling for a plan that keeps everything. */
+export const DEFAULT_EXPORT_CAP: ExportCap = {
+  days: MAX_EXPORT_DAYS,
+  reason: "deux ans",
+};
+
+/**
+ * The export's ceiling for this plan: its retention window when it has one,
+ * two years when it doesn't.
+ *
+ * Retention is what the shop still keeps — punches older than it are deleted
+ * every night (convex/badges.ts purgeOld) — so offering a longer range would
+ * offer days that no longer exist. The window is counted on the same dates the
+ * purge uses, so the number on the screen is the data that is actually there.
+ *
+ * A plan that keeps longer than the file may hold gets the two-year ceiling
+ * and says so with the same words as a plan that keeps nothing back.
+ */
+export function exportCap(retentionMonths: number | null, now = Date.now()): ExportCap {
+  if (retentionMonths === null) return DEFAULT_EXPORT_CAP;
+  const months = Math.max(1, Math.round(retentionMonths));
+  const days = spanLength(dayKey(monthsAgo(months, now)), dayKey(now));
+  if (days >= MAX_EXPORT_DAYS) return DEFAULT_EXPORT_CAP;
+  return {
+    days,
+    reason: months === 1 ? "1 mois de pointages" : `${months} mois de pointages`,
+  };
+}
 
 /** How many periods one export may name. The picker puts a checkbox on each, so
  *  a "select everything" on a long history must not build an unbounded list. */
@@ -77,14 +120,28 @@ export function periodTitle(scale: ExportScale, key: string): string {
 }
 
 /** The "this week" / "this month" preset buttons, as a concrete span. */
-export function spansFromPeriod(period: "week" | "month"): ExportSpan[] {
-  const today = dayKey(Date.now());
+export function spansFromPeriod(
+  period: "week" | "month",
+  today = dayKey(Date.now()),
+): ExportSpan[] {
   if (period === "week") {
     const monday = mondayOf(today);
     return [{ from: monday, to: addDays(monday, 6) }];
   }
   const days = daysInMonth(today.slice(0, 7));
   return [{ from: days[0], to: days[days.length - 1] }];
+}
+
+/**
+ * The span a shortcut fills into the two dates, never past today.
+ *
+ * Mid-week, "cette semaine" means the days worked so far — the days after
+ * today have not happened and the date fields refuse them. The completed
+ * week is one tick away in the picker's own list.
+ */
+export function presetSpan(period: "week" | "month", today: string): ExportSpan {
+  const [span] = spansFromPeriod(period, today);
+  return { from: span.from, to: span.to < today ? span.to : today };
 }
 
 /** Sort, then join spans that overlap or merely touch. */
@@ -106,6 +163,121 @@ export function mergeSpans(spans: ExportSpan[]): ExportSpan[] {
   return merged;
 }
 
+/**
+ * What a selection would export, and whether it may.
+ *
+ * This is the one place a selection is judged. The browser asks it before it
+ * offers the export button — so a selection that the server would refuse is
+ * refused on the screen, in the same words — and the server asks it before it
+ * builds the file. Two ends, one answer: a two-year ceiling the picker
+ * respects is a ceiling the picker can explain.
+ */
+export type ExportSelectionSummary = {
+  /** Calendar days the selection covers, overlaps counted once. */
+  days: number;
+  /** The first day covered, or null when nothing is selected. */
+  from: string | null;
+  /** The last day covered, or null. */
+  to: string | null;
+  /** How many separate blocks the selection makes. */
+  blocks: number;
+  /** The file's own header for this selection. */
+  label: string;
+  /** Why the selection can't be exported, or null when it can. */
+  blocked: string | null;
+  /** True when nothing is selected at all. */
+  empty: boolean;
+  /** The ceiling this selection was judged against, so the screen can name the
+   *  number and the reason without being told them separately. */
+  cap: ExportCap;
+};
+
+/**
+ * Judge a selection: how many days it covers, and what stands in its way.
+ *
+ * Days are counted on the merged blocks, so ticking three weeks that overlap
+ * a month counts the month once. The ceiling is the same one the server
+ * enforces, computed the same way, which is what lets the picker show the
+ * number before anyone clicks.
+ */
+export function summarizeSelection(
+  spans: ExportSpan[],
+  cap: ExportCap = DEFAULT_EXPORT_CAP,
+): ExportSelectionSummary {
+  const nothing: ExportSelectionSummary = {
+    days: 0,
+    from: null,
+    to: null,
+    blocks: 0,
+    label: "",
+    blocked: "Choisissez au moins une période à exporter.",
+    empty: true,
+    cap,
+  };
+  if (spans.length === 0) return nothing;
+  if (spans.length > MAX_EXPORT_SPANS) {
+    return {
+      ...nothing,
+      empty: false,
+      blocked: `Trop de périodes sélectionnées (${MAX_EXPORT_SPANS} maximum).`,
+    };
+  }
+  for (const span of spans) {
+    if (spanLength(span.from, span.to) === 0) {
+      return {
+        ...nothing,
+        empty: false,
+        blocked: `Période invalide : ${span.from} → ${span.to}.`,
+      };
+    }
+  }
+
+  const merged = mergeSpans(spans);
+  const days = merged.reduce((sum, span) => sum + spanLength(span.from, span.to), 0);
+  const first = merged[0];
+  const last = merged[merged.length - 1];
+  const label =
+    merged.length === 1
+      ? first.from === first.to
+        ? shortDay(first.from)
+        : `${shortDay(first.from)} – ${shortDay(first.to)}`
+      : `${merged.length} périodes (${shortDay(first.from)} – ${shortDay(last.to)})`;
+
+  return {
+    days,
+    from: first.from,
+    to: last.to,
+    blocks: merged.length,
+    label,
+    blocked:
+      days > cap.days
+        ? `Export limité à ${cap.days} jours (${cap.reason}) à la fois.`
+        : null,
+    empty: false,
+    cap,
+  };
+}
+
+/**
+ * The spans a picker's selection amounts to: the bounds of every ticked
+ * period, plus the custom range when it is complete and in order.
+ *
+ * The ticked periods keep the bounds the server handed out — a week is never
+ * recomputed in the browser — and a half-filled or reversed range contributes
+ * nothing rather than a span the server would have to refuse. The rule lives
+ * here so the browser and the server agree on what a selection is.
+ */
+export function spansFromSelection(
+  options: ExportPeriodOption[],
+  range?: { from: string; to: string } | null,
+): ExportSpan[] {
+  const spans: ExportSpan[] = options.map(({ from, to }) => ({ from, to }));
+  if (range && range.from && range.to && range.from <= range.to) {
+    spans.push({ from: range.from, to: range.to });
+  }
+  return spans;
+}
+
 /** A resolved selection: the exact days to export, and how to name them. */
 export type ExportSelection = { days: Set<string>; label: string };
 
@@ -121,33 +293,21 @@ export type ExportSelection = { days: Set<string>; label: string };
 export function resolveSelection(
   spans: ExportSpan[] | undefined,
   period: "week" | "month" | undefined,
+  cap: ExportCap = DEFAULT_EXPORT_CAP,
 ): ExportSelection {
   const chosen = spans && spans.length > 0 ? spans : period ? spansFromPeriod(period) : [];
-  if (chosen.length === 0) throw new Error("Choisissez au moins une période à exporter.");
-  if (chosen.length > MAX_EXPORT_SPANS) {
-    throw new Error(`Trop de périodes sélectionnées (${MAX_EXPORT_SPANS} maximum).`);
-  }
+
+  // The same judgment the browser made before offering the button, with the
+  // same ceiling. A client that lies about its selection is refused here with
+  // the same words.
+  const summary = summarizeSelection(chosen, cap);
+  if (summary.blocked) throw new Error(summary.blocked);
 
   const days = new Set<string>();
   for (const span of chosen) {
-    const list = spanDays(span.from, span.to);
-    if (list.length === 0) throw new Error(`Période invalide : ${span.from} → ${span.to}.`);
-    for (const day of list) days.add(day);
+    for (const day of spanDays(span.from, span.to)) days.add(day);
   }
-  if (days.size > MAX_EXPORT_DAYS) {
-    throw new Error("Export limité à deux ans de pointages à la fois.");
-  }
-
-  const merged = mergeSpans(chosen);
-  const first = merged[0];
-  const last = merged[merged.length - 1];
-  const label =
-    merged.length === 1
-      ? first.from === first.to
-        ? shortDay(first.from)
-        : `${shortDay(first.from)} – ${shortDay(first.to)}`
-      : `${merged.length} périodes (${shortDay(first.from)} – ${shortDay(last.to)})`;
-  return { days, label };
+  return { days, label: summary.label };
 }
 
 /**

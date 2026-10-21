@@ -1,82 +1,60 @@
 import { useState } from "react";
-import { useAction } from "convex/react";
-import { CalendarRange, Download, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { useQuery } from "convex/react";
+import { Download } from "lucide-react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { ExportPeriodDialog } from "@/components/ExportPeriodDialog";
-import { downloadBase64 } from "@/lib/download";
 
 /**
- * The export buttons on the admin screens.
+ * The export button on the admin screens.
  *
- * Two one-click presets — cette semaine, ce mois — because the payroll run
- * almost always wants exactly those and shouldn't have to open a dialog to get
- * them. Everything else (a specific week, several months, a whole year, an
- * arbitrary range) goes through "Autres périodes", which opens the picker.
+ * One button, one dialog: a free range of dates, any number of weeks, months
+ * and years ticked, or the "cette semaine" / "ce mois-ci" shortcuts inside.
+ * The admin sees the period the file will be named after before it is built,
+ * and nothing is exported that the screen did not spell out.
  *
- * Both paths end in the same place: `toXlsx` with either the `period` preset
- * or the spans the picker collected, resolved by the same code server-side
- * (convex/lib/exportRange.ts). Pass `userId` for one employee, omit it for the
- * whole shop.
- *
- * Admin only and plan-gated server-side (convex/badges.ts exportData). These
- * buttons render for any admin; a plan without export finds out on click,
- * except in the picker, which says so before offering any period.
+ * The plan is read before the button is offered (convex/plan.ts capabilities):
+ * a plan without the export shows why, in place, instead of offering a button
+ * the server would refuse a second later. The server still refuses it — the
+ * screen is not the lock, it is the warning. The dialog is mounted only while
+ * open, so its periods query never runs on a screen nobody opened.
  */
 export function ExportExcelButtons({ userId }: { userId?: Id<"users"> }) {
-  const toXlsx = useAction(api.export.toXlsx);
-  const [busy, setBusy] = useState<"week" | "month" | null>(null);
+  const plan = useQuery(api.plan.capabilities);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function download(period: "week" | "month") {
-    setBusy(period);
-    try {
-      const { filename, base64 } = await toXlsx({ userId, period });
-      downloadBase64(filename, base64);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Export impossible");
-    } finally {
-      setBusy(null);
-    }
+  if (plan && !plan.exportExcel) {
+    return (
+      <div className="rounded-lg border bg-muted/40 px-4 py-3">
+        <p className="text-sm">L'export n'est pas inclus dans ce forfait.</p>
+      </div>
+    );
   }
 
+  // Until the plan is known, nothing is live: a button that turns out to be
+  // locked is the refusal this screen exists to avoid.
+  const checking = plan === undefined;
+
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
       <Button
         variant="outline"
         size="sm"
-        disabled={busy !== null}
-        onClick={() => void download("week")}
-      >
-        {busy === "week" ? <Loader2 className="animate-spin" /> : <Download />}
-        Semaine (Excel)
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy !== null}
-        onClick={() => void download("month")}
-      >
-        {busy === "month" ? <Loader2 className="animate-spin" /> : <Download />}
-        Mois (Excel)
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy !== null}
+        disabled={checking}
         onClick={() => setPickerOpen(true)}
       >
-        <CalendarRange />
-        Autres périodes
+        <Download />
+        Exporter (Excel)
       </Button>
 
-      {/* Mounted only while open, so the picker restarts on every visit and its
-          periods query doesn't run on a screen the admin never opened. */}
       {pickerOpen && (
         <ExportPeriodDialog userId={userId} onOpenChange={setPickerOpen} />
+      )}
+
+      {checking && (
+        <p className="text-sm text-muted-foreground">Vérification du forfait…</p>
       )}
     </div>
   );

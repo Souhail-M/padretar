@@ -37,6 +37,16 @@ export function monthLabel(month: string): string {
   }).format(new Date(`${month}-01T12:00:00Z`));
 }
 
+/** "2026-08-03" -> "3 août 2026" — the date without its weekday, for a range. */
+export function dateLabel(date: string): string {
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
 /** A timestamp -> "14:05", Paris time. */
 export function timeLabel(ts: number): string {
   return new Intl.DateTimeFormat("fr-FR", {

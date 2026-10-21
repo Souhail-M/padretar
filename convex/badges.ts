@@ -18,6 +18,7 @@ import {
   MAX_PERIOD_OPTIONS,
   periodBounds,
   periodTitle,
+  exportCap,
   resolveSelection,
   type ExportPeriodOption,
   type ExportScale,
@@ -452,6 +453,10 @@ async function exportTargets(
  * Admin only. Deliberately not plan-gated — a plan without export should see
  * an empty picker explaining itself, not a button that throws on click.
  *
+ * `cap` is how far one export may reach on this plan (exportCap): the
+ * retention window when the plan has one, two years when it doesn't. The
+ * picker refuses a wider selection in the same words the server will use.
+ *
  * Reads are bounded by EXPORT_PERIOD_READ_BUDGET across all employees, so the
  * shop-wide picker costs about what the single-employee one does.
  */
@@ -493,6 +498,7 @@ export const exportPeriods = query({
 
     return {
       allowed,
+      cap: exportCap(planLimits().retentionMonths),
       weeks: options("week"),
       months: options("month"),
       years: options("year"),
@@ -524,7 +530,11 @@ export const exportData = internalQuery({
       throw new Error("L'export n'est pas inclus dans ce forfait.");
     }
 
-    const { days: wanted, label } = resolveSelection(spans, period);
+    const { days: wanted, label } = resolveSelection(
+      spans,
+      period,
+      exportCap(planLimits().retentionMonths),
+    );
     const ordered = [...wanted].sort();
 
     // The index bounds are widened a day past the selection on each side.

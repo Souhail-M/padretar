@@ -747,6 +747,36 @@ describe("choosing which periods to export", () => {
     expect(periods.months.map((m) => m.key)).toContain("2026-01");
     delete process.env.CSV_EXPORT;
   });
+
+  test("the picker's ceiling is the plan's retention window, not two years", async () => {
+    process.env.CSV_EXPORT = "true";
+    process.env.RETENTION_MONTHS = "12";
+    const { admin, userId } = await twoWeeksApart();
+
+    const periods = await admin.query(api.badges.exportPeriods, { userId });
+    // The shop only keeps a year, so offering two would offer days the nightly
+    // purge has already deleted.
+    expect(periods.cap.reason).toBe("12 mois de pointages");
+    expect(periods.cap.days).toBeGreaterThan(360);
+    expect(periods.cap.days).toBeLessThan(370);
+    delete process.env.RETENTION_MONTHS;
+    delete process.env.CSV_EXPORT;
+  });
+
+  test("a plan with a retention window refuses a wider export, naming it", async () => {
+    process.env.CSV_EXPORT = "true";
+    process.env.RETENTION_MONTHS = "12";
+    const { admin, userId } = await twoWeeksApart();
+
+    await expect(
+      admin.query(internal.badges.exportData, {
+        userId,
+        spans: [{ from: "2024-01-01", to: "2025-06-30" }],
+      }),
+    ).rejects.toThrow(/12 mois/);
+    delete process.env.RETENTION_MONTHS;
+    delete process.env.CSV_EXPORT;
+  });
 });
 
 describe("day helpers", () => {

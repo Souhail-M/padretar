@@ -71,6 +71,24 @@ export function spanDays(from: string, to: string): string[] {
   return out;
 }
 
+/**
+ * How many days "from" to "to" covers, inclusive — 0 when the range is
+ * malformed or reversed.
+ *
+ * The export's ceiling is counted in calendar days, not in days carrying a
+ * punch, so it is read off the bounds themselves. The count is what the
+ * browser shows before the export is even attempted, and it has to be the
+ * same number the server counts when it finally refuses.
+ */
+export function spanLength(from: string, to: string): number {
+  const key = /^\d{4}-\d{2}-\d{2}$/;
+  if (!key.test(from) || !key.test(to) || to < from) return 0;
+  const start = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${to}T00:00:00Z`);
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0;
+  return Math.round((end - start) / 86_400_000) + 1;
+}
+
 /** "2026-08-03" -> "03/08/2026" — the compact stamp period labels are made of. */
 export function shortDay(date: string): string {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -100,9 +118,9 @@ export function monthTitle(month: string): string {
   }).format(new Date(`${month}-01T12:00:00Z`));
 }
 
-/** Timestamp `months` calendar months before now — the retention cutoff. */
-export function monthsAgo(months: number): number {
-  const d = new Date();
+/** Timestamp `months` calendar months before `now` — the retention cutoff. */
+export function monthsAgo(months: number, now = Date.now()): number {
+  const d = new Date(now);
   d.setUTCMonth(d.getUTCMonth() - months);
   return d.getTime();
 }
