@@ -30,3 +30,11 @@ dist-ssr
 
 # Windows/git-bash crash dumps
 *.stackdump
+
+# Local agent tooling and the taste-skill's working files
+.agents/
+.claude/
+.vibe/
+.taste-skill/
+skills-lock.json
+preview/
