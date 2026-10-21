@@ -8,6 +8,11 @@ et consulte le relevé de chaque employé. Rien d'autre — et c'est délibéré
 
 ## Démarrer
 
+> **Une nouvelle boutique ?** La procédure complète est dans
+> [`docs/ONBOARDING.md`](docs/ONBOARDING.md) : déploiement, variables,
+> construction, domaine, contrôle final, et les pièges connus. Ce fichier
+> résume le produit ; le document fait la mise en service.
+
 ```bash
 npm install
 npm run dev          # Convex + Vite ensemble
@@ -240,7 +245,7 @@ docker run -d -p 8080:80 padretar
 
 ```
 convex/
-  schema.ts      3 tables : users, badges, kiosk
+  schema.ts      4 tables : users, badges, kiosk, kioskExit
   auth.ts        Convex Auth (mot de passe) + bootstrap ADMIN_EMAIL
   lib/auth.ts    requireActive / requireAdmin — toute fonction commence par là
   lib/day.ts     fuseau Paris, semaines, durées
@@ -254,6 +259,11 @@ convex/
 src/
   pages/         écrans employé puis admin/
   components/    SignIn, Layout, PunchDialog, DayList
+docs/
+  ONBOARDING.md  mise en service d'une nouvelle boutique, étape par étape
+  adr/           les décisions qui ne se défont pas
+  plans/         le plan du cycle en cours
+GLOSSARY.md      le vocabulaire du domaine
 ```
 
 ## Volontairement absent
