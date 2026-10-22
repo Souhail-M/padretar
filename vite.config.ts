@@ -18,8 +18,13 @@ export default defineConfig({
         display: "fullscreen",
         // Falls back to standalone on browsers that don't take fullscreen.
         display_override: ["fullscreen", "standalone"],
+        // Free rotation: the kiosk panel is propped landscape, but an
+        // employee grabbing the tablet reads it portrait. JS-side
+        // screen.orientation.lock overrides over a manifest lock are not
+        // honored reliably on Android — the manifest is the one lock that
+        // always applies.
         background_color: "#000000",
-        orientation: "landscape",
+        orientation: "any",
         start_url: "/kiosk",
         theme_color: "#000000",
         icons: [

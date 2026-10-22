@@ -36,19 +36,6 @@ export function Kiosk() {
     lock();
   }, [lock]);
 
-  // The manifest opens the app landscape, but the kiosk is read from a wall
-  // tablet or from a hand: it must follow the tablet between portrait and
-  // landscape. Screen locks only take effect in fullscreen (this is a
-  // fullscreen PWA), so over the manifest's landscape with "any" works here;
-  // leaving the kiosk restores the landscape lock for the admin screens.
-  useEffect(() => {
-    const orientation = screen.orientation;
-    void orientation?.lock?.("any").catch(() => {});
-    return () => {
-      void orientation?.lock?.("landscape").catch(() => {});
-    };
-  }, []);
-
   // The mutation is held in a ref so the interval can depend on nothing.
   // useMutation returns a fresh function identity on every render, so keying
   // the effect on it made each rotation re-run the effect and rotate again —
