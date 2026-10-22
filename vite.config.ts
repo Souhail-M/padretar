@@ -15,8 +15,10 @@ export default defineConfig({
       manifest: {
         name: "Padretar Kiosk",
         short_name: "Padretar",
-        display: "standalone",
-        background_color: "#0a0a0a",
+        display: "fullscreen",
+        // Falls back to standalone on browsers that don't take fullscreen.
+        display_override: ["fullscreen", "standalone"],
+        background_color: "#000000",
         orientation: "landscape",
         start_url: "/kiosk",
         theme_color: "#000000",

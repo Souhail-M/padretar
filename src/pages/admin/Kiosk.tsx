@@ -84,7 +84,7 @@ export function Kiosk() {
   }, []);
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center gap-10 bg-black px-6 py-10">
+    <div className="relative flex h-dvh flex-col items-center justify-center gap-[2.5dvh] overflow-hidden bg-black px-6 py-[2dvh]">
       <div className="absolute inset-x-0 top-0">
         <ConnectionBanner />
       </div>
@@ -109,16 +109,16 @@ export function Kiosk() {
 
       <Wordmark className="text-xl text-neutral-400" />
 
-      <div className="rounded-2xl bg-white p-6 sm:p-8">
+      <div className="rounded-2xl bg-white p-[2dvh]">
         {code ? (
           <QRCodeSVG
             value={code}
             size={320}
             level="M"
-            className="h-[min(60vw,20rem)] w-[min(60vw,20rem)]"
+            className="h-[min(56dvh,46vw,44rem)] w-[min(56dvh,46vw,44rem)]"
           />
         ) : (
-          <div className="h-[min(60vw,20rem)] w-[min(60vw,20rem)]" />
+          <div className="h-[min(56dvh,46vw,44rem)] w-[min(56dvh,46vw,44rem)]" />
         )}
       </div>
 
@@ -126,7 +126,7 @@ export function Kiosk() {
         <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">
           ou saisissez ce code
         </p>
-        <p className="tnum mt-3 text-5xl font-light tracking-[0.35em] text-white sm:text-6xl">
+        <p className="tnum mt-[1.5dvh] text-[clamp(1.75rem,7.5dvh,3.75rem)] font-light tracking-[0.35em] text-white">
           {code ?? "······"}
         </p>
       </div>
