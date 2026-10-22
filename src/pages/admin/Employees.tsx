@@ -67,10 +67,13 @@ export function Employees() {
                 {[employee.poste, employee.email].filter(Boolean).join(" · ")}
               </p>
 
-              <div className="flex justify-end">
+              {/* Full-width thumb targets in portrait, right-aligned compact
+                  buttons on desktop. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 {employee.status === "pending" && (
                   <Button
                     size="sm"
+                    className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
                     onClick={() =>
                       void run(
                         approve({ userId: employee._id }),
@@ -85,6 +88,7 @@ export function Employees() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
                     onClick={() =>
                       void run(
                         setStatus({ userId: employee._id, status: "disabled" }),
@@ -99,6 +103,7 @@ export function Employees() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
                     onClick={() =>
                       void run(
                         setStatus({ userId: employee._id, status: "active" }),

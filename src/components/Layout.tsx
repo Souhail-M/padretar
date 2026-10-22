@@ -36,7 +36,10 @@ export function Layout({ isAdmin, nom }: { isAdmin: boolean; nom: string }) {
   const links = isAdmin ? adminNav : employeeNav;
 
   return (
-    <div className="min-h-dvh">
+    // No orientation is ever forced: every page lays out portrait-first, so
+    // the dashboard never asks a phone to turn sideways. The bottom padding
+    // keeps the last content clear of the home indicator (viewport-fit=cover).
+    <div className="min-h-dvh pb-[env(safe-area-inset-bottom)]">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <ConnectionBanner />
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4">
@@ -66,9 +69,11 @@ export function Layout({ isAdmin, nom }: { isAdmin: boolean; nom: string }) {
                 key={link.to}
                 to={link.to}
                 end={link.end}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            className={({ isActive }) =>
+              cn(
+                // Thumb-sized on a phone, compact on desktop: the employee side
+                // is used one-handed, standing in the shop.
+                "flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:min-h-0",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : Icon
@@ -83,9 +88,7 @@ export function Layout({ isAdmin, nom }: { isAdmin: boolean; nom: string }) {
             );
           })}
         </nav>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      </header>        <main className="mx-auto max-w-6xl px-4 py-4 sm:py-6">
         <Outlet />
       </main>
     </div>

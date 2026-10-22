@@ -71,8 +71,8 @@ export function KioskPasswordCard() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-[12rem] flex-1 space-y-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-0 flex-1 space-y-2 sm:basis-48">
           <Label htmlFor="kiosk-exit-password" className="sr-only">
             Nouveau mot de passe de sortie
           </Label>
@@ -87,6 +87,7 @@ export function KioskPasswordCard() {
         </div>
         <Button
           size="sm"
+          className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
           disabled={busy || password.trim().length < 6}
           onClick={() => void save()}
         >
@@ -96,6 +97,7 @@ export function KioskPasswordCard() {
           <Button
             size="sm"
             variant="outline"
+            className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
             disabled={busy}
             onClick={() => void reset()}
           >

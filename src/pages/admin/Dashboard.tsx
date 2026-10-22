@@ -14,11 +14,11 @@ import { minutesSince, useNow } from "@/lib/useNow";
 /** One glanceable number, the vocabulary of a dashboard's top row. */
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="min-w-0 rounded-xl border bg-card p-3 sm:p-4">
+      <p className="text-[0.65rem] uppercase tracking-[0.16em] text-muted-foreground sm:text-xs sm:tracking-[0.2em]">
         {label}
       </p>
-      <p className="tnum mt-1 text-2xl">{value}</p>
+      <p className="tnum mt-1 truncate text-xl sm:text-2xl">{value}</p>
     </div>
   );
 }
@@ -73,7 +73,7 @@ export function Dashboard() {
   return (
     <div className="space-y-8">
       {pending.length > 0 && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-foreground/40 bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/40 bg-card p-4">
           <p className="text-sm">
             {pending.length === 1
               ? "1 compte attend votre validation."
@@ -92,9 +92,11 @@ export function Dashboard() {
         <StatTile label="En attente" value={`${pending.length}`} />
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Single column in portrait, side by side from lg up: nothing here
+          needs a sideways phone, the columns simply reflow. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
         <section className="space-y-3">
-          <div className="flex items-baseline justify-between">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
               Présence
             </h2>
@@ -116,7 +118,7 @@ export function Dashboard() {
                           get to that employee's timesheet. */}
                       <Link
                         to={`/admin/employes/${row.userId}`}
-                        className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-accent/50"
+                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-accent/50"
                       >
                         <span
                           aria-hidden
@@ -128,7 +130,10 @@ export function Dashboard() {
                           <Icon className="size-4" />
                         </span>
 
-                        <span className="min-w-0 flex-1">
+                        {/* Name and poste take what is left of the row; the
+                            time block drops underneath on a narrow phone
+                            rather than squeezing the name to nothing. */}
+                        <span className="min-w-0 flex-1 basis-32">
                           <span className="block truncate">{row.nom}</span>
                           {row.poste && (
                             <span className="block truncate text-sm text-muted-foreground">
@@ -137,7 +142,7 @@ export function Dashboard() {
                           )}
                         </span>
 
-                        <span className="tnum shrink-0 text-right text-sm">
+                        <span className="tnum order-last w-full min-w-0 pl-[3.25rem] text-left text-sm sm:order-none sm:w-auto sm:pl-0 sm:text-right">
                           {row.isIn && row.sinceAt ? (
                             <>
                               <span className="block font-medium uppercase tracking-wider text-enter">
@@ -164,7 +169,7 @@ export function Dashboard() {
                           )}
                         </span>
 
-                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                        <ChevronRight className="size-4 shrink-0 self-start text-muted-foreground sm:self-center" />
                       </Link>
                     </li>
                   );
@@ -209,7 +214,7 @@ export function Dashboard() {
         </section>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
         <section className="space-y-3">
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Export

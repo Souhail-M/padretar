@@ -138,23 +138,31 @@ export function ExportPicker({
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2" role="group" aria-labelledby="export-period">
+        {/* Stacked in portrait — two native date fields never fit side by
+            side on a 320px phone — side by side as soon as they fit. */}
+        <div
+          className="flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center"
+          role="group"
+          aria-labelledby="export-period"
+        >
           <Input
             type="date"
             aria-label="Du"
             max={today}
             value={from}
             onChange={(event) => onFromChange(event.target.value)}
-            className="flex-1"
+            className="w-full flex-1"
           />
-          <span className="text-sm text-muted-foreground">au</span>
+          <span className="text-center text-sm text-muted-foreground min-[420px]:text-left">
+            au
+          </span>
           <Input
             type="date"
             aria-label="Au"
             max={today}
             value={to}
             onChange={(event) => onToChange(event.target.value)}
-            className="flex-1"
+            className="w-full flex-1"
           />
         </div>
 

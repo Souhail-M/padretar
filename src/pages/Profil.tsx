@@ -11,7 +11,7 @@ export function Profil() {
   const total = days?.reduce((sum, day) => sum + day.minutes, 0) ?? 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <section className="space-y-3">
         <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
           Mon profil

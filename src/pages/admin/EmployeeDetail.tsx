@@ -109,13 +109,14 @@ export function EmployeeDetail() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div className="space-y-1">
         <h1 className="wordmark text-lg">{employee.nom || employee.email}</h1>
         <p className="text-sm text-muted-foreground">{employee.email}</p>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Stacked in portrait, side by side from lg up. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
         <section className="space-y-4">
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Fiche
@@ -158,7 +159,11 @@ export function EmployeeDetail() {
               </Select>
             </div>
           </div>
-          <Button onClick={() => void save()} disabled={draft === null}>
+          <Button
+            onClick={() => void save()}
+            disabled={draft === null}
+            className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
+          >
             Enregistrer
           </Button>
         </section>
@@ -167,8 +172,8 @@ export function EmployeeDetail() {
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Mot de passe oublié
           </h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[14rem] flex-1 space-y-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 space-y-2 sm:basis-56">
               <Label htmlFor="new-password">Nouveau mot de passe</Label>
               {/* Shown in clear on purpose: this one is read out loud to the
                   employee standing there, not typed in secret. */}
@@ -183,6 +188,7 @@ export function EmployeeDetail() {
             </div>
             <Button
               variant="outline"
+              className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
               disabled={newPassword.trim().length < 8 || resetting}
               onClick={() => void resetPasswordNow()}
             >
@@ -321,7 +327,7 @@ export function EmployeeDetail() {
                             <button
                               type="button"
                               aria-label="Corriger ce pointage"
-                              className="ml-2 shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              className="ml-2 flex shrink-0 items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground max-sm:min-h-[44px] max-sm:min-w-[44px]"
                               onClick={() =>
                                 setEditTarget({
                                   mode: "edit",
@@ -338,7 +344,7 @@ export function EmployeeDetail() {
                           renderDayExtra={(day) => (
                             <button
                               type="button"
-                              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                              className="mt-2 flex min-h-[44px] items-center gap-1 py-1 text-xs text-muted-foreground underline-offset-4 hover:underline sm:min-h-0"
                               onClick={() =>
                                 setEditTarget({
                                   mode: "add",

@@ -109,16 +109,19 @@ export function Kiosk() {
 
       <Wordmark className="text-xl text-neutral-400" />
 
+      {/* 78vw instead of 46vw: in portrait the QR was pocket-sized while
+          vertical space sat empty; in landscape 56dvh still binds first, so
+          landscape rendering is unchanged. */}
       <div className="rounded-2xl bg-white p-[2dvh]">
         {code ? (
           <QRCodeSVG
             value={code}
             size={320}
             level="M"
-            className="h-[min(56dvh,46vw,44rem)] w-[min(56dvh,46vw,44rem)]"
+            className="h-[min(56dvh,78vw,44rem)] w-[min(56dvh,78vw,44rem)]"
           />
         ) : (
-          <div className="h-[min(56dvh,46vw,44rem)] w-[min(56dvh,46vw,44rem)]" />
+          <div className="h-[min(56dvh,78vw,44rem)] w-[min(56dvh,78vw,44rem)]" />
         )}
       </div>
 

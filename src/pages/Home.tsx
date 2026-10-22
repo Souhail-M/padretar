@@ -22,11 +22,11 @@ export function Home() {
   const elapsed = status?.since ? minutesSince(status.since, now) : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* State is carried by fill vs outline, never by colour. */}
       <section
         className={cn(
-          "rounded-lg border p-8 text-center transition-colors",
+          "rounded-lg border p-6 text-center transition-colors sm:p-8",
           isIn ? "bg-primary text-primary-foreground" : "bg-transparent",
         )}
       >

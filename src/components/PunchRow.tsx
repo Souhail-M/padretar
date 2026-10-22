@@ -27,7 +27,7 @@ export function PunchRow({
   const Icon = isIn ? ArrowDownLeft : ArrowUpRight;
 
   return (
-    <div className="flex items-center gap-4 rounded-lg px-3 py-3">
+    <div className="flex items-center gap-3 rounded-lg px-2 py-2.5 sm:gap-4 sm:px-3 sm:py-3">
       <span
         aria-hidden
         className={cn(
