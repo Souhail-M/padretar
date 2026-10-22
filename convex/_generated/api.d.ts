@@ -23,6 +23,7 @@ import type * as lib_exportRange from "../lib/exportRange.js";
 import type * as password from "../password.js";
 import type * as plan from "../plan.js";
 import type * as superadmin from "../superadmin.js";
+import type * as telegram from "../telegram.js";
 
 import type {
   ApiFromModules,
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   password: typeof password;
   plan: typeof plan;
   superadmin: typeof superadmin;
+  telegram: typeof telegram;
 }>;
 
 /**

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { isHidden, requireActive, requireAdmin, requireTarget } from "./lib/auth";
@@ -112,6 +113,16 @@ export const punch = mutation({
 
     const type = isIn(last, now) ? ("out" as const) : ("in" as const);
     await ctx.db.insert("badges", { userId: user._id, at: now, type });
+
+    // Announce to the shop's Telegram chat when the bot is configured
+    // (convex/telegram.ts); otherwise the scheduled action no-ops. The
+    // announcement goes through the scheduler, so a slow or dead Telegram
+    // cannot hold the punch response open.
+    await ctx.scheduler.runAfter(0, internal.telegram.announcePunch, {
+      nom: user.nom ?? user.email ?? "Employé",
+      type,
+      at: now,
+    });
     return type;
   },
 });
