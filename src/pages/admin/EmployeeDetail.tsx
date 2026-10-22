@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { useParams } from "react-router-dom";
-import { Pencil, Plus } from "lucide-react";
+import { ChevronDown, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { DayList } from "@/components/DayList";
+import { DayCard, type Day } from "@/components/DayList";
 import { ExportExcelButtons } from "@/components/ExportExcelButtons";
 import { EditPunchDialog } from "@/components/EditPunchDialog";
 import type { EditPunchTarget } from "@/components/EditPunchDialog";
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatMinutes, monthLabel, weekLabel } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 /** How many periods are worth showing; further back is history, not payroll. */
 const PERIODS_SHOWN = 8;
@@ -47,6 +48,35 @@ export function EmployeeDetail() {
   const [resetting, setResetting] = useState(false);
 
   const [editTarget, setEditTarget] = useState<EditPunchTarget | null>(null);
+
+  // The whole history laid flat ran 400+ rows down the page; the reel is
+  // read month by month anyway (payroll weeks live in the Totaux list above),
+  // so the month is the scroll unit here. Days arrive newest-first from the
+  // server, so insertion order into each bucket is already chronological.
+  const months = useMemo(() => {
+    const buckets = new Map<string, Day[]>();
+    for (const day of timesheet?.days ?? []) {
+      const key = day.date.slice(0, 7);
+      const bucket = buckets.get(key);
+      if (bucket) bucket.push(day);
+      else buckets.set(key, [day]);
+    }
+    return [...buckets.entries()];
+  }, [timesheet?.days]);
+
+  const monthTotals = useMemo(
+    () => new Map((timesheet?.months ?? []).map((p) => [p.key, p])),
+    [timesheet?.months],
+  );
+
+  // One month open at a time — the page stays as short as its summary.
+  // undefined = never touched (newest month open, where the recent work is);
+  // null = the user closed everything on purpose.
+  const [chosenMonth, setChosenMonth] = useState<string | null | undefined>(
+    undefined,
+  );
+  const openMonth =
+    chosenMonth === undefined ? (months[0]?.[0] ?? null) : chosenMonth;
 
   async function save() {
     try {
@@ -226,34 +256,115 @@ export function EmployeeDetail() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Pointages
-        </h2>
-        <DayList
-          days={timesheet?.days}
-          renderRight={(p, date) => (
-            <button
-              type="button"
-              aria-label="Corriger ce pointage"
-              className="ml-2 shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={() =>
-                setEditTarget({ mode: "edit", badgeId: p._id, date, time: p.label, type: p.type })
-              }
-            >
-              <Pencil className="size-4" />
-            </button>
-          )}
-          renderDayExtra={(day) => (
-            <button
-              type="button"
-              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
-              onClick={() => setEditTarget({ mode: "add", userId, date: day.date })}
-            >
-              <Plus className="size-3" />
-              Ajouter un pointage
-            </button>
-          )}
-        />
+        <div className="flex flex-wrap items-baseline justify-between gap-4">
+          <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Pointages
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {timesheet?.days.length ?? 0} jours de relevé, pliés par mois
+          </p>
+        </div>
+        {timesheet === undefined ? null : months.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun pointage.</p>
+        ) : (
+          <div className="divide-y divide-border/50 rounded-xl border bg-card">
+            {months.map(([month, days]) => {
+              const total = monthTotals.get(month);
+              const open = month === openMonth;
+              return (
+                <article key={month}>
+                  <button
+                    type="button"
+                    id={`month-${month}`}
+                    aria-expanded={open}
+                    aria-controls={`month-panel-${month}`}
+                    onClick={() => setChosenMonth(open ? null : month)}
+                    className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-accent/50"
+                  >
+                    <span className="flex items-baseline gap-3">
+                      <span className="text-sm font-medium capitalize">
+                        {monthLabel(month)}
+                      </span>
+                      <span className="tnum text-xs text-muted-foreground">
+                        {days.length}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="tnum text-sm">
+                        {formatMinutes(total?.minutes ?? 0)}
+                        {total?.incomplete && (
+                          <span className="text-exit"> *</span>
+                        )}
+                      </span>
+                      <ChevronDown
+                        aria-hidden
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                          open && "rotate-180",
+                        )}
+                      />
+                    </span>
+                  </button>
+                  {open && (
+                    <div
+                      id={`month-panel-${month}`}
+                      role="region"
+                      aria-labelledby={`month-${month}`}
+                      className="px-4 pb-4"
+                    >
+                      {days.map((day) => (
+                        <DayCard
+                          key={day.date}
+                          day={day}
+                          flat
+                          renderRight={(p, date) => (
+                            <button
+                              type="button"
+                              aria-label="Corriger ce pointage"
+                              className="ml-2 shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              onClick={() =>
+                                setEditTarget({
+                                  mode: "edit",
+                                  badgeId: p._id,
+                                  date,
+                                  time: p.label,
+                                  type: p.type,
+                                })
+                              }
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                          )}
+                          renderDayExtra={(day) => (
+                            <button
+                              type="button"
+                              className="mt-2 flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                              onClick={() =>
+                                setEditTarget({
+                                  mode: "add",
+                                  userId,
+                                  date: day.date,
+                                })
+                              }
+                            >
+                              <Plus className="size-3" />
+                              Ajouter un pointage
+                            </button>
+                          )}
+                        />
+                      ))}
+                      {days.some((d) => d.incomplete) && (
+                        <p className="pt-2 text-xs text-muted-foreground">
+                          * journée sans sortie : total sous-évalué.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <EditPunchDialog

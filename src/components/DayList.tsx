@@ -4,7 +4,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 type Punch = { _id: Id<"badges">; at: number; type: "in" | "out"; label: string };
 
-type Day = {
+export type Day = {
   date: string;
   punches: Punch[];
   minutes: number;
@@ -26,6 +26,62 @@ function withSpans(punches: Punch[]) {
     openedAt = null;
     return { ...p, duration };
   });
+}
+
+/** One day's block: date header, its punches, the missing-exit note. `flat`
+ *  drops the card chrome for placement inside a parent list — same content,
+ *  no nested borders. */
+export function DayCard({
+  day,
+  flat = false,
+  renderRight,
+  renderDayExtra,
+}: {
+  day: Day;
+  flat?: boolean;
+  renderRight?: (punch: Punch, date: string) => React.ReactNode;
+  renderDayExtra?: (day: Day) => React.ReactNode;
+}) {
+  return (
+    <div
+      className={
+        flat
+          ? "py-4 first:pt-1 last:pb-2"
+          : "rounded-xl border bg-card p-4"
+      }
+    >
+      <div className="flex items-baseline justify-between gap-4 border-b pb-3">
+        <p className="text-sm font-medium capitalize">
+          {longDate(day.date)}
+        </p>
+        <p className="tnum shrink-0 text-sm text-muted-foreground">
+          Total {formatMinutes(day.minutes)}
+        </p>
+      </div>
+
+      <div className="mt-2 divide-y divide-border/50">
+        {withSpans(day.punches).map((p) => (
+          <PunchRow
+            key={p.at}
+            type={p.type}
+            time={p.label}
+            duration={p.duration}
+            right={renderRight?.(p, day.date)}
+          />
+        ))}
+      </div>
+
+      {renderDayExtra?.(day)}
+
+      {day.incomplete && (
+        // Stated plainly rather than closed at a guessed time — inventing
+        // an end time would fabricate worked hours.
+        <p className="pt-2 text-xs text-exit">
+          Sortie manquante — journée incomplète.
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -53,38 +109,12 @@ export function DayList({
   return (
     <div className="space-y-4">
       {days.map((day) => (
-        <div key={day.date} className="rounded-xl border bg-card p-4">
-          <div className="flex items-baseline justify-between gap-4 border-b pb-3">
-            <p className="text-sm font-medium capitalize">
-              {longDate(day.date)}
-            </p>
-            <p className="tnum shrink-0 text-sm text-muted-foreground">
-              Total {formatMinutes(day.minutes)}
-            </p>
-          </div>
-
-          <div className="mt-2 divide-y divide-border/50">
-            {withSpans(day.punches).map((p) => (
-              <PunchRow
-                key={p.at}
-                type={p.type}
-                time={p.label}
-                duration={p.duration}
-                right={renderRight?.(p, day.date)}
-              />
-            ))}
-          </div>
-
-          {renderDayExtra?.(day)}
-
-          {day.incomplete && (
-            // Stated plainly rather than closed at a guessed time — inventing
-            // an end time would fabricate worked hours.
-            <p className="pt-2 text-xs text-exit">
-              Sortie manquante — journée incomplète.
-            </p>
-          )}
-        </div>
+        <DayCard
+          key={day.date}
+          day={day}
+          renderRight={renderRight}
+          renderDayExtra={renderDayExtra}
+        />
       ))}
     </div>
   );
