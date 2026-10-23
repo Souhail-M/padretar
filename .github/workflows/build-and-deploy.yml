@@ -78,13 +78,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Optional: skipped cleanly until the two secrets exist, so the first
-      # runs stay green while Coolify is still being set up.
+      # Coolify's deploy webhook is POST-only; a GET is answered with 405
+      # "This endpoint has changed to a POST request." The image was still
+      # pushed on every run, so production kept serving the previous image
+      # while this step quietly failed the job.
       - name: Trigger Coolify redeploy
         if: env.COOLIFY_WEBHOOK != ''
         run: |
           curl --fail-with-body --silent --show-error \
-            --request GET "$COOLIFY_WEBHOOK" \
+            --request POST "$COOLIFY_WEBHOOK" \
             --header "Authorization: Bearer $COOLIFY_TOKEN"
 
       - name: Note when deploy is not wired up
