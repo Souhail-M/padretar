@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useParams } from "react-router-dom";
-import { ChevronDown, Pencil, Plus } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "../../../convex/_generated/api";
@@ -11,6 +11,14 @@ import { ExportExcelButtons } from "@/components/ExportExcelButtons";
 import { EditPunchDialog } from "@/components/EditPunchDialog";
 import type { EditPunchTarget } from "@/components/EditPunchDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMinutes, monthLabel, weekLabel } from "@/lib/format";
+import { formatMinutes, monthLabel, todayKey, weekLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** How many periods are worth showing; further back is history, not payroll. */
@@ -33,6 +41,8 @@ export function EmployeeDetail() {
   const employee = useQuery(api.employees.get, { userId });
   const timesheet = useQuery(api.badges.forEmployee, { userId });
   const update = useMutation(api.employees.update);
+  const removeEmployee = useMutation(api.employees.remove);
+  const navigate = useNavigate();
   const resetPassword = useAction(api.password.resetForEmployee);
 
   // Uncontrolled until first edit, so the fields fill in when the query lands.
@@ -48,6 +58,8 @@ export function EmployeeDetail() {
   const [resetting, setResetting] = useState(false);
 
   const [editTarget, setEditTarget] = useState<EditPunchTarget | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // The whole history laid flat ran 400+ rows down the page; the reel is
   // read month by month anyway (payroll weeks live in the Totaux list above),
@@ -85,6 +97,22 @@ export function EmployeeDetail() {
       toast.success("Fiche enregistrée");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
+    }
+  }
+
+  async function removeNow() {
+    setDeleting(true);
+    try {
+      await removeEmployee({ userId });
+      toast.success("Compte supprimé");
+      setConfirmDelete(false);
+      navigate("/admin/employes");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Suppression impossible",
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -262,13 +290,28 @@ export function EmployeeDetail() {
       </section>
 
       <section className="space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Pointages
           </h2>
-          <p className="text-xs text-muted-foreground">
-            {timesheet?.days.length ?? 0} jours de relevé, pliés par mois
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              {timesheet?.days.length ?? 0} jours de relevé, pliés par mois
+            </p>
+            {/* Always offered, including for a day the kiosk never saw: a
+                forgotten clock-in is exactly the day no card exists for. */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-[44px] sm:min-h-0"
+              onClick={() =>
+                setEditTarget({ mode: "add", userId, date: todayKey() })
+              }
+            >
+              <Plus />
+              Ajouter un pointage
+            </Button>
+          </div>
         </div>
         {timesheet === undefined ? null : months.length === 0 ? (
           <p className="text-sm text-muted-foreground">Aucun pointage.</p>
@@ -372,6 +415,67 @@ export function EmployeeDetail() {
           </div>
         )}
       </section>
+
+      {/* Deletion is offered only with nothing to preserve: an account that
+          punched keeps its timesheet, so it is disabled from the list
+          instead — the server enforces the same rule. */}
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Supprimer
+        </h2>
+        {timesheet === undefined ? null : timesheet.days.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Ce compte a un relevé de pointages : il ne peut pas être
+            supprimé. Pour retirer son accès, désactivez-le depuis la liste
+            des employés — son relevé sera conservé.
+          </p>
+        ) : (
+          <div className="space-y-3 rounded-xl border bg-card p-4">
+            <p className="text-sm text-muted-foreground">
+              Supprime définitivement ce compte et sa session. Irréversible —
+              mais il n'a aucun pointage, donc rien d'autre ne disparaît.
+            </p>
+            <Button
+              variant="outline"
+              className="min-h-[44px] w-full sm:min-h-0 sm:w-auto"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 />
+              Supprimer ce compte
+            </Button>
+          </div>
+        )}
+      </section>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Supprimer ce compte ?</DialogTitle>
+            <DialogDescription>
+              {employee.nom || employee.email} ne pourra plus se connecter.
+              Irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={deleting}
+              onClick={() => void removeNow()}
+            >
+              {deleting ? "Suppression…" : "Supprimer définitivement"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EditPunchDialog
         target={editTarget}

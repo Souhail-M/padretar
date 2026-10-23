@@ -297,6 +297,50 @@ describe("manual punch corrections", () => {
     expect(days[0].minutes).toBe(480);
   });
 
+  test("addPunch can open a day no punch existed for", async () => {
+    const { admin, userId } = await shopWithHistory([]);
+
+    await admin.mutation(api.badges.addPunch, {
+      userId,
+      date: "2026-08-04",
+      time: "09:00",
+      type: "in",
+    });
+    await admin.mutation(api.badges.addPunch, {
+      userId,
+      date: "2026-08-04",
+      time: "17:00",
+      type: "out",
+    });
+
+    const days = (await admin.query(api.badges.forEmployee, { userId })).days;
+    expect(days).toHaveLength(1);
+    expect(days[0].date).toBe("2026-08-04");
+    expect(days[0].minutes).toBe(480);
+    expect(days[0].incomplete).toBe(false);
+  });
+
+  test("editPunch files a punch under another date", async () => {
+    const { t, admin } = await shopWithHistory([
+      { at: "2026-08-03T09:00:00+02:00", type: "in" },
+      { at: "2026-08-03T17:00:00+02:00", type: "out" },
+    ]);
+    const exit = (
+      await t.run(async (ctx) => ctx.db.query("badges").collect())
+    ).find((b) => b.type === "out")!;
+
+    await admin.mutation(api.badges.editPunch, {
+      badgeId: exit._id,
+      date: "2026-08-04",
+      time: "17:00",
+      type: "out",
+    });
+
+    const moved = await t.run(async (ctx) => ctx.db.get(exit._id));
+    // 17:00 Paris in August (UTC+2) is 15:00 UTC, on the new day.
+    expect(new Date(moved!.at).toISOString()).toBe("2026-08-04T15:00:00.000Z");
+  });
+
   test("deletePunch removes an erroneous duplicate", async () => {
     const { t, admin } = await shopWithHistory([
       { at: "2026-08-03T09:00:00+02:00", type: "in" },

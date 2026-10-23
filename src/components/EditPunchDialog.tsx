@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { longDate } from "@/lib/format";
+import { longDate, todayKey } from "@/lib/format";
 
 export type EditPunchTarget =
   | { mode: "edit"; badgeId: Id<"badges">; date: string; time: string; type: "in" | "out" }
@@ -36,6 +36,11 @@ export type EditPunchTarget =
  * closed at a guessed time (see convex/badges.ts `punch`) — this dialog is
  * the visible, admin-only override for when the real time turns out to be
  * known after all.
+ *
+ * The date is editable in both modes: a punch filed on the wrong day is the
+ * same class of mistake as a wrong time, and the server takes the date for
+ * both edit and add (convex/badges.ts). It is capped at today in Paris — an
+ * attendance record cannot describe a shift that has not happened.
  */
 export function EditPunchDialog({
   target,
@@ -48,6 +53,7 @@ export function EditPunchDialog({
   const addPunch = useMutation(api.badges.addPunch);
   const deletePunch = useMutation(api.badges.deletePunch);
 
+  const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [type, setType] = useState<"in" | "out">("in");
   const [busy, setBusy] = useState(false);
@@ -56,22 +62,24 @@ export function EditPunchDialog({
   // arrives rather than carrying over the previous punch's values.
   useEffect(() => {
     if (target?.mode === "edit") {
+      setDate(target.date);
       setTime(target.time);
       setType(target.type);
     } else if (target?.mode === "add") {
+      setDate(target.date);
       setTime("");
       setType("in");
     }
   }, [target]);
 
   async function save() {
-    if (!target || !time) return;
+    if (!target || !date || !time) return;
     setBusy(true);
     try {
       if (target.mode === "edit") {
-        await editPunch({ badgeId: target.badgeId, date: target.date, time, type });
+        await editPunch({ badgeId: target.badgeId, date, time, type });
       } else {
-        await addPunch({ userId: target.userId, date: target.date, time, type });
+        await addPunch({ userId: target.userId, date, time, type });
       }
       toast.success("Pointage enregistré");
       onOpenChange(false);
@@ -104,7 +112,7 @@ export function EditPunchDialog({
             {target?.mode === "edit" ? "Corriger ce pointage" : "Ajouter un pointage"}
           </DialogTitle>
           <DialogDescription className="capitalize">
-            {target && longDate(target.date)}
+            {date ? longDate(date) : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -123,6 +131,18 @@ export function EditPunchDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="punch-date">Date</Label>
+            <Input
+              id="punch-date"
+              type="date"
+              max={todayKey()}
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="punch-time">Heure</Label>
             <Input
               id="punch-time"
@@ -135,7 +155,11 @@ export function EditPunchDialog({
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          <Button className="w-full" disabled={busy || !time} onClick={() => void save()}>
+          <Button
+            className="w-full"
+            disabled={busy || !date || !time}
+            onClick={() => void save()}
+          >
             {busy && <Loader2 className="animate-spin" />}
             Enregistrer
           </Button>
