@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feuille de route &amp; guide du responsable — Padretar</title>
+<style>
+  :root{
+    --bg:#0a0a0a; --fg:#fafafa; --card:#111111; --muted:#171717;
+    --muted-fg:#a3a3a3; --border:#262626; --accent:#262626;
+    --enter:#5ec98a; --enter-bg:#14301f; --exit:#e08a7a; --exit-bg:#331a16;
+    --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;line-height:1.65;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:72rem;margin:0 auto;padding:0 1.25rem}
+
+  /* ---------- header ---------- */
+  .top{position:sticky;top:0;z-index:20;background:rgba(10,10,10,.94);
+       backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+  .top .wrap{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+             gap:.75rem;padding-top:.9rem;padding-bottom:.9rem}
+  .brand{font-family:var(--serif);font-weight:500;letter-spacing:.14em;
+         text-transform:uppercase;font-size:1.05rem}
+  .brand small{display:block;font-family:var(--sans);font-size:.6rem;letter-spacing:.22em;
+               color:var(--muted-fg);margin-top:.15rem}
+  .top .meta{font-size:.72rem;color:var(--muted-fg);letter-spacing:.08em;text-transform:uppercase}
+  .top-actions{display:flex;align-items:center;gap:.5rem}
+  .print-btn{font:inherit;font-size:.78rem;color:var(--fg);background:transparent;
+             border:1px solid var(--border);border-radius:999px;padding:.35rem .8rem;cursor:pointer}
+  .print-btn:hover{background:var(--accent)}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:15rem minmax(0,1fr);gap:2.5rem;align-items:start}
+  .toc{position:sticky;top:5.2rem;padding:1.75rem 0 3rem;border-right:1px solid var(--border);
+       font-size:.86rem}
+  .toc p{font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-fg);
+         margin:0 0 .7rem;padding-right:1rem}
+  .toc ol{list-style:none;margin:0;padding:0}
+  .toc li{margin:.1rem 0}
+  .toc a{display:flex;gap:.6rem;padding:.32rem .75rem .32rem 0;color:var(--muted-fg);
+         border-radius:.35rem;transition:color .15s}
+  .toc a:hover{color:var(--fg)}
+  .toc a .n{font-variant-numeric:tabular-nums;font-size:.72rem;opacity:.6;width:1.1rem;flex:none}
+  main{padding:1.75rem 0 5rem;min-width:0}
+
+  /* ---------- type ---------- */
+  h1{font-size:2rem;line-height:1.2;margin:.4rem 0 .6rem;font-weight:600;letter-spacing:-.01em}
+  h1 .sub{display:block;font-family:var(--serif);font-weight:400;font-size:1.05rem;
+          letter-spacing:.04em;color:var(--muted-fg);margin-top:.5rem;text-transform:none}
+  .kicker{font-size:.66rem;letter-spacing:.24em;text-transform:uppercase;color:var(--muted-fg)}
+  h2{font-size:1.32rem;margin:0 0 .35rem;font-weight:600;letter-spacing:-.005em;
+     display:flex;align-items:baseline;gap:.7rem}
+  h2 .n{font-family:var(--serif);font-size:.95rem;color:var(--muted-fg);
+        border:1px solid var(--border);border-radius:.35rem;padding:.05rem .45rem;flex:none}
+  h3{font-size:.95rem;margin:1.8rem 0 .5rem;font-weight:600}
+  section{padding-top:3rem;border-top:1px solid var(--border);margin-top:3rem}
+  section:first-of-type{border-top:0;margin-top:1.5rem;padding-top:0}
+  .lead{color:var(--muted-fg);max-width:46rem;margin:.35rem 0 1.2rem}
+  p{margin:.7rem 0}
+  strong{font-weight:600}
+  .dim{color:var(--muted-fg)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85em;
+       background:var(--muted);border:1px solid var(--border);border-radius:.3rem;padding:.08rem .35rem}
+  pre{background:#0f0f0f;border:1px solid var(--border);border-radius:.6rem;
+      padding:.85rem 1rem;overflow-x:auto;font-size:.82rem;line-height:1.55}
+  pre code{background:none;border:0;padding:0}
+  ul.clean{list-style:none;padding:0;margin:.6rem 0}
+  ul.clean li{position:relative;padding-left:1.15rem;margin:.35rem 0}
+  ul.clean li::before{content:"—";position:absolute;left:0;color:var(--muted-fg)}
+
+  /* ---------- steps ---------- */
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:1rem 0}
+  ol.steps>li{counter-increment:s;position:relative;padding-left:2.2rem;margin:.85rem 0}
+  ol.steps>li::before{content:counter(s);position:absolute;left:0;top:.05rem;
+    width:1.5rem;height:1.5rem;border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;font-size:.75rem;
+    font-variant-numeric:tabular-nums;color:var(--muted-fg)}
+  ol.steps>li b{display:block}
+
+  /* ---------- callouts ---------- */
+  .note,.warn,.tip{border-left:2px solid var(--border);background:var(--card);
+    border-radius:0 .5rem .5rem 0;padding:.75rem 1rem;margin:1.1rem 0;font-size:.9rem}
+  .note :first-child,.warn :first-child,.tip :first-child{margin-top:0}
+  .note :last-child,.warn :last-child,.tip :last-child{margin-bottom:0}
+  .warn{border-left-color:var(--exit);background:var(--exit-bg)}
+  .tip{border-left-color:var(--enter);background:var(--enter-bg)}
+  .tag{display:inline-block;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;
+    border:1px solid var(--border);border-radius:999px;padding:.1rem .5rem;color:var(--muted-fg);
+    vertical-align:middle}
+  .tag.new{border-color:var(--fg);color:var(--fg)}
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto;margin:1rem 0}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:34rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:.64rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-fg);font-weight:500}
+  tbody tr:hover{background:#0f0f0f}
+
+  /* ---------- checklists ---------- */
+  .cards{display:grid;gap:.85rem;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));margin:1.2rem 0}
+  .box{border:1px solid var(--border);border-radius:.75rem;background:var(--card);padding:1rem}
+  .box h4{margin:0 0 .5rem;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-fg)}
+  .check{list-style:none;padding:0;margin:0;font-size:.9rem}
+  .check li{display:flex;gap:.55rem;padding:.22rem 0}
+  .check li::before{content:"";flex:none;width:.85rem;height:.85rem;margin-top:.4rem;
+    border:1px solid var(--border);border-radius:.2rem}
+
+  /* ---------- mock screens ---------- */
+  .shot{margin:1.4rem 0 1.9rem;border:1px solid var(--border);border-radius:.9rem;
+        overflow:hidden;background:#0a0a0a}
+  .shot-bar{display:flex;align-items:center;gap:.5rem;padding:.5rem .85rem;
+    background:#131313;border-bottom:1px solid var(--border);
+    font-size:.7rem;color:var(--muted-fg);letter-spacing:.04em}
+  .shot-bar .dots{display:flex;gap:.25rem;margin-right:.3rem}
+  .shot-bar .dots i{width:.45rem;height:.45rem;border-radius:50%;background:#2e2e2e}
+  .shot-bar .url{margin-left:auto;font-family:ui-monospace,monospace;opacity:.7}
+  .shot figcaption{font-size:.74rem;color:var(--muted-fg);padding:.55rem .85rem;
+    border-top:1px solid var(--border);background:#131313}
+  .body{padding:1rem;font-size:.78rem;line-height:1.5}
+  .center{text-align:center}
+  .wordmark{font-family:var(--serif);text-transform:uppercase;letter-spacing:.18em;font-weight:500}
+
+  .m-note{display:flex;align-items:center;justify-content:space-between;gap:.75rem;
+    border:1px solid #3a3a3a;border-radius:.6rem;padding:.55rem .75rem;margin-bottom:.8rem;font-size:.78rem}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin-bottom:.9rem}
+  .tile{border:1px solid var(--border);border-radius:.6rem;background:var(--card);padding:.5rem .6rem}
+  .tile p{margin:0;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-fg)}
+  .tile b{display:block;font-size:1.05rem;margin-top:.15rem;font-variant-numeric:tabular-nums}
+  .h{font-size:.55rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-fg);
+     display:flex;justify-content:space-between;margin:0 0 .4rem}
+  .card{border:1px solid var(--border);border-radius:.6rem;background:var(--card);overflow:hidden}
+  .row{display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-bottom:1px solid #1e1e1e}
+  .row:last-child{border-bottom:0}
+  .ic{flex:none;width:1.6rem;height:1.6rem;border-radius:50%;display:grid;place-items:center;font-size:.7rem}
+  .ic.in{background:var(--enter-bg);color:var(--enter)}
+  .ic.out{background:var(--exit-bg);color:var(--exit)}
+  .who{min-width:0;flex:1}
+  .who b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .who small{display:block;color:var(--muted-fg);font-size:.7rem}
+  .when{text-align:right;flex:none;font-variant-numeric:tabular-nums}
+  .when b{display:block;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase}
+  .when small{display:block;color:var(--muted-fg);font-size:.7rem}
+  .enter{color:var(--enter)} .exitc{color:var(--exit)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  .btn{display:inline-block;border:1px solid var(--border);border-radius:.4rem;
+    padding:.3rem .7rem;font-size:.72rem;white-space:nowrap}
+  .btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg);font-weight:600}
+  .btn.ghost{color:var(--muted-fg)}
+  .btn.destructive{background:#2e2e2e;color:var(--fg)}
+  .badge{display:inline-block;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;
+    border:1px solid var(--border);border-radius:999px;padding:.05rem .4rem;color:var(--muted-fg)}
+  .badge.solid{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .ecard{border:1px solid var(--border);border-radius:.6rem;background:var(--card);padding:.6rem}
+  .ecard .topline{display:flex;justify-content:space-between;align-items:start;gap:.5rem}
+  .ecard .name{font-weight:500;font-size:.82rem}
+  .ecard .sub{color:var(--muted-fg);font-size:.72rem;margin:.15rem 0 .55rem}
+  .ecard .acts{display:flex;gap:.35rem;justify-content:flex-end;flex-wrap:wrap}
+  .field{margin-bottom:.55rem}
+  .field label{display:block;font-size:.66rem;color:var(--muted-fg);margin-bottom:.2rem}
+  .input{border:1px solid #2e2e2e;border-radius:.35rem;padding:.35rem .5rem;font-size:.75rem;
+    color:var(--muted-fg);background:#0d0d0d}
+  .dlg{border:1px solid #333;border-radius:.6rem;background:#101010;padding:.8rem;max-width:17rem;margin:0 auto}
+  .dlg h5{margin:0 0 .15rem;font-size:.85rem;font-weight:600}
+  .dlg .desc{margin:0 0 .6rem;color:var(--muted-fg);font-size:.7rem;text-transform:capitalize}
+  .dlg .foot{display:flex;flex-direction:column;gap:.35rem;margin-top:.7rem}
+  .dlg .foot .btn{text-align:center;padding:.4rem}
+  .tabs{display:flex;gap:.25rem;margin-bottom:.6rem}
+  .tab{font-size:.7rem;padding:.25rem .55rem;border-radius:.35rem;color:var(--muted-fg)}
+  .tab.on{background:var(--fg);color:var(--bg);font-weight:600}
+  .opt{display:flex;align-items:center;gap:.45rem;padding:.25rem 0;font-size:.75rem;color:#d4d4d4}
+  .boxc{width:.7rem;height:.7rem;border:1px solid #3a3a3a;border-radius:.15rem;flex:none}
+  .boxc.on{background:var(--fg);border-color:var(--fg);position:relative}
+  .boxc.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+    font-size:.5rem;color:var(--bg)}
+  .kiosk{background:#000;border-radius:.5rem;padding:1.4rem .9rem;text-align:center}
+  .kiosk .qr{background:#fff;border-radius:.5rem;padding:.5rem;width:9rem;margin:.8rem auto}
+  .kiosk .code{font-variant-numeric:tabular-nums;letter-spacing:.35em;font-size:1.5rem;
+    font-weight:300;margin:.6rem 0 .1rem}
+  .kiosk .hint{font-size:.55rem;letter-spacing:.2em;text-transform:uppercase;color:#737373;margin:0}
+  .phone{max-width:17rem;margin:0 auto;border:1px solid #333;border-radius:1.1rem;padding:.55rem;background:#000}
+  .phone .scr{border-radius:.7rem;padding:.7rem;background:var(--bg)}
+  .pill-state{border:1px solid var(--border);border-radius:.5rem;padding:.9rem .5rem;text-align:center}
+  .pill-state p{margin:0;font-size:.55rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-fg)}
+  .pill-state b{display:block;font-family:var(--serif);font-size:1.5rem;letter-spacing:.14em;
+    text-transform:uppercase;margin-top:.2rem}
+  .bigbtn{display:block;text-align:center;background:var(--fg);color:var(--bg);font-weight:600;
+    border-radius:.4rem;padding:.6rem;margin:.55rem 0;font-size:.78rem}
+  .month{border:1px solid var(--border);border-radius:.6rem;background:var(--card);overflow:hidden}
+  .month .mh{display:flex;justify-content:space-between;align-items:center;padding:.5rem .65rem;
+    border-bottom:1px solid #1e1e1e;font-size:.8rem}
+  .month .mh b{font-weight:500;text-transform:capitalize}
+  .punch{display:flex;align-items:center;gap:.6rem;padding:.4rem .65rem;border-bottom:1px solid #1a1a1a}
+  .punch:last-child{border-bottom:0}
+  .pencil{margin-left:auto;color:var(--muted-fg);font-size:.8rem}
+  .totals{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0 .8rem}
+  .tot{border:1px solid var(--border);border-radius:.45rem;padding:.35rem .55rem;font-size:.72rem;
+    background:var(--card);white-space:nowrap}
+  .tot b{font-variant-numeric:tabular-nums;margin-left:.3rem}
+
+  @media (max-width:900px){
+    .layout{display:block}
+    .toc{position:static;border-right:0;border-bottom:1px solid var(--border);
+         padding:.85rem 0 1rem;margin-bottom:0}
+    .toc p{margin-bottom:.5rem}
+    .toc ol{display:flex;gap:.3rem;overflow-x:auto;padding-bottom:.3rem}
+    .toc a{padding:.35rem .6rem;border:1px solid var(--border);border-radius:.45rem;
+           white-space:nowrap;color:var(--fg);font-size:.78rem}
+    .toc a .n{display:none}
+    main{padding-top:1.25rem}
+    .cols{grid-template-columns:1fr}
+    .tiles{grid-template-columns:repeat(2,1fr)}
+    h1{font-size:1.6rem}
+  }
+  @media print{
+    :root{--bg:#fff;--fg:#000;--card:#fafafa;--muted:#f2f2f2;--muted-fg:#555;
+          --border:#c9c9c9;--accent:#eee;--enter:#1c6b3c;--enter-bg:#eef7f1;
+          --exit:#8a3b2c;--exit-bg:#fbefec}
+    .top{position:static;background:#fff}
+    .toc{display:none}
+    .layout{display:block}
+    .shot{break-inside:avoid}
+    section{break-inside:avoid-page}
+    pre,.dlg,.kiosk,.phone{background:#fff}
+    .kiosk{background:#fff;border:1px solid #000}
+    .kiosk .code{color:#000}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      Padretar
+      <small>Dar as Saada</small>
+    </div>
+    <div class="top-actions">
+      <span class="meta">Feuille de route &amp; guide du responsable</span>
+      <button class="print-btn" type="button" onclick="window.print()">Imprimer</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+
+  <nav class="toc" aria-label="Sommaire">
+    <p>Sommaire</p>
+    <ol>
+      <li><a href="#demarrer"><span class="n">01</span>Première mise en route</a></li>
+      <li><a href="#journee"><span class="n">02</span>La journée du responsable</a></li>
+      <li><a href="#tableau"><span class="n">03</span>Le tableau de bord</a></li>
+      <li><a href="#kiosque"><span class="n">04</span>Le kiosque</a></li>
+      <li><a href="#pointer"><span class="n">05</span>Pointer, côté employé</a></li>
+      <li><a href="#comptes"><span class="n">06</span>Gérer les comptes</a></li>
+      <li><a href="#fiche"><span class="n">07</span>La fiche employé</a></li>
+      <li><a href="#export"><span class="n">08</span>Exporter pour la paie</a></li>
+      <li><a href="#forfait"><span class="n">09</span>Forfait et limites</a></li>
+      <li><a href="#depannage"><span class="n">10</span>Dépannage</a></li>
+      <li><a href="#support"><span class="n">11</span>Support et coulisses</a></li>
+      <li><a href="#limites"><span class="n">12</span>Ce que l'app ne fait pas</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <p class="kicker">Document de référence</p>
+    <h1>
+      Feuille de route &amp; guide du responsable
+      <span class="sub">Tout ce que l'application sait faire, écran par écran, avec la marche à suivre.</span>
+    </h1>
+
+    <p class="lead">
+      Cette page est faite pour être lue une fois en entier, puis gardée ouverte
+      dans un onglet. Elle couvre la mise en route, le pointage au quotidien,
+      la gestion des employés, les corrections d'heures, l'export de paie et
+      les cas où quelque chose ne marche pas. Les vignettes sont des
+      reconstitutions fidèles des écrans de l'application, avec des données
+      d'exemple&nbsp;; votre boutique y verra ses propres noms et ses propres heures.
+    </p>
+
+    <div class="note">
+      <p>
+        <strong>Trois idées à retenir, tout le reste en découle.</strong>
+        <br>1. L'employé crée son compte lui-même, vous le <strong>validez</strong>.
+        <br>2. On ne pointe qu'en scannant le <strong>code du kiosque</strong>, qui change toutes les 30&nbsp;secondes.
+        <br>3. Une heure de travail <strong>ne s'effface pas</strong> : on la corrige, on ne la supprime pas. Seuls les comptes sans relevé peuvent être supprimés.
+      </p>
+    </div>
+
+    <!-- ================================================================ -->
+    <section id="demarrer">
+      <h2><span class="n">01</span>Première mise en route</h2>
+      <p class="lead">
+        Une seule adresse à ouvrir sur le téléphone du responsable et sur
+        l'écran de la boutique. Aucune installation, aucune boutique d'applications.
+      </p>
+
+      <ol class="steps">
+        <li>
+          <b>Ouvrez l'adresse de votre boutique</b>
+          Depuis Chrome, Safari ou Edge. Sur un téléphone, vous pouvez ensuite
+          choisir «&nbsp;Ajouter à l'écran d'accueil&nbsp;»&nbsp;: l'app s'ouvre
+          alors en plein écran, comme une application installée.
+        </li>
+        <li>
+          <b>Créez le compte du responsable</b>
+          «&nbsp;Pas encore de compte&nbsp;? En créer un&nbsp;», puis prénom, nom,
+          email et mot de passe (8 caractères minimum). Le <em>tout premier
+          compte créé sur une instance neuve devient automatiquement
+          administrateur et actif</em> — c'est vous, le responsable.
+        </li>
+        <li>
+          <b>Faites créer les comptes des employés</b>
+          Chacun crée le sien avec son propre email. Leur compte arrive en
+          <strong>«&nbsp;En attente&nbsp;»</strong> et n'ouvre aucun accès : ils
+          voient seulement «&nbsp;votre compte doit être validé&nbsp;». C'est
+          vous qui validez (section 06).
+        </li>
+        <li>
+          <b>Ouvrez le kiosque</b>
+          Menu <strong>Kiosque</strong>&nbsp;: l'écran affiche le QR code de
+          pointage. Posez cette tablette ou ce téléphone à l'entrée de la
+          boutique, branché (section 04).
+        </li>
+        <li>
+          <b>Choisissez le mot de passe de sortie du kiosque</b>
+          Sur le tableau de bord, carte <strong>Kiosque</strong>&nbsp;: c'est ce
+          mot de passe qui libère l'écran quand vous devez en sortir. Sans lui,
+          c'est votre mot de passe de compte qui est demandé.
+        </li>
+      </ol>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Connexion<span class="url">/</span></div>
+        <div class="body center">
+          <p class="wordmark" style="font-size:1.1rem;margin:.6rem 0 .1rem">Padretar</p>
+          <p style="font-size:.55rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted-fg);margin:0 0 1rem">Padretar</p>
+          <div style="max-width:12rem;margin:0 auto;text-align:left">
+            <div class="field"><label>Prénom &nbsp;·&nbsp; Nom</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem">
+                <div class="input">Amina</div><div class="input">Benali</div>
+              </div>
+            </div>
+            <div class="field"><label>Email</label><div class="input">amina@boutique.ma</div></div>
+            <div class="field"><label>Mot de passe</label><div class="input">••••••••</div></div>
+            <div class="btn primary" style="display:block;text-align:center;padding:.4rem">Créer mon compte</div>
+            <p style="font-size:.66rem;color:var(--muted-fg);text-align:center;margin:.5rem 0 0">J'ai déjà un compte</p>
+          </div>
+        </div>
+        <figcaption>Écran d'entrée : la même page sert à se connecter et à créer un compte.</figcaption>
+      </figure>
+
+      <div class="tip">
+        <p>
+          <strong>Le premier jour, faites-vous un compte à part.</strong> Un compte
+          par personne, jamais un compte partagé&nbsp;: les corrections
+          d'heures et les validations sont tracées par compte, et un compte
+          partagé rend toute correction suspecte.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="journee">
+      <h2><span class="n">02</span>La journée du responsable</h2>
+      <p class="lead">
+        C'est la feuille de route au sens propre&nbsp;: ce qu'on regarde, et
+        quand. Trois minutes le matin, deux le soir, dix par semaine.
+      </p>
+
+      <div class="cards">
+        <div class="box">
+          <h4>Le matin</h4>
+          <ul class="check">
+            <li>Tableau de bord ouvert, aucun compte « en attente »</li>
+            <li>Kiosque affiché, QR visible, tablette branchée</li>
+            <li>Présence : les arrivées de la veille sont bien sorties</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h4>Le soir</h4>
+          <ul class="check">
+            <li>Journées marquées d'un astérisque * (sortie oubliée)</li>
+            <li>Heures corrigées si besoin (section 07)</li>
+            <li>Kiosque laissé affiché, écran verrouillé</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h4>Chaque semaine</h4>
+          <ul class="check">
+            <li>Totaux des 7 derniers jours relus employé par employé</li>
+            <li>Export Excel de la semaine, classé</li>
+            <li>Comptes à désactiver (départs, doublons)</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h4>Chaque mois</h4>
+          <ul class="check">
+            <li>Export du mois complet pour la paie</li>
+            <li>Vérification des journées incomplètes</li>
+            <li>Contrôle du nombre d'employés actifs (forfait)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="note">
+        <p>
+          <strong>Rien à faire pour que le pointage fonctionne.</strong> Pas de
+          synchronisation à lancer, pas de clôture de journée&nbsp;: chaque scan
+          est enregistré immédiatement et apparaît sur le tableau de bord dans
+          la seconde. Le seul travail humain est la validation des comptes et
+          la correction des oublis.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="tableau">
+      <h2><span class="n">03</span>Le tableau de bord</h2>
+      <p class="lead">
+        L'écran d'arrivée du responsable. Il répond à trois questions&nbsp;:
+        qui est là, combien d'heures ont été faites aujourd'hui, et qu'est-ce
+        qui attend une décision de ma part.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Tableau de bord<span class="url">/admin</span></div>
+        <div class="body">
+          <div class="m-note"><span>1 compte attend votre validation.</span><span class="btn primary">Voir</span></div>
+          <div class="tiles">
+            <div class="tile"><p>Présents</p><b>3</b></div>
+            <div class="tile"><p>Employés actifs</p><b>6</b></div>
+            <div class="tile"><p>Heures aujourd'hui</p><b>14h55</b></div>
+            <div class="tile"><p>En attente</p><b>1</b></div>
+          </div>
+          <div class="cols">
+            <div>
+              <div class="h"><span>Présence</span><span>3 sur place</span></div>
+              <div class="card">
+                <div class="row">
+                  <span class="ic in">↓</span>
+                  <span class="who"><b>Amina Benali</b><small>Vendeuse</small></span>
+                  <span class="when"><b class="enter">Dedans</b><small>depuis 08:12 · 4h05</small></span>
+                </div>
+                <div class="row">
+                  <span class="ic in">↓</span>
+                  <span class="who"><b>Youssef Amrani</b><small>Livreur</small></span>
+                  <span class="when"><b class="enter">Dedans</b><small>depuis 09:00 · 3h17</small></span>
+                </div>
+                <div class="row">
+                  <span class="ic out">↑</span>
+                  <span class="who"><b>Salma Idrissi</b><small>Caissière</small></span>
+                  <span class="when"><b class="dim">Dehors</b><small>sortie à 12:04</small></span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="h"><span>Pointages du jour</span></div>
+              <div class="card">
+                <div class="row"><span class="ic in">↓</span><span class="who"><b>Entrée</b><small style="font-size:.85rem;color:var(--fg)">08:12</small></span><span class="when"><small>Amina</small></span></div>
+                <div class="row"><span class="ic in">↓</span><span class="who"><b>Entrée</b><small style="font-size:.85rem;color:var(--fg)">09:00</small></span><span class="when"><small>Youssef</small></span></div>
+                <div class="row"><span class="ic out">↑</span><span class="who"><b>Sortie</b><small style="font-size:.85rem;color:var(--fg)">12:04</small></span><span class="when"><small>Salma</small></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Le tableau de bord : bandeau de validation, quatre totaux, présence en direct, pointages du jour.</figcaption>
+      </figure>
+
+      <h3>Ce que chaque bloc vous dit</h3>
+      <ul class="clean">
+        <li><strong>Présents</strong> — le nombre de personnes actuellement «&nbsp;dedans&nbsp;», c'est-à-dire ayant pointé une entrée sans sortie.</li>
+        <li><strong>Employés actifs</strong> — les comptes validés, hors comptes désactivés et hors comptes en attente.</li>
+        <li><strong>Heures aujourd'hui</strong> — la somme de tous les créneaux de la journée. Un créneau encore ouvert continue de compter&nbsp;: le chiffre monte tout seul, il n'est pas figé au dernier pointage.</li>
+        <li><strong>En attente</strong> — les inscriptions à valider. Le bandeau en haut de page est le rappel&nbsp;; il disparaît quand la file est vide.</li>
+        <li><strong>Présence</strong> — une ligne par employé actif, avec «&nbsp;Dedans depuis 08:12 · 4h05&nbsp;» ou «&nbsp;Dehors&nbsp;» et l'heure de la dernière sortie. Toucher une ligne ouvre sa fiche.</li>
+        <li><strong>Pointages du jour</strong> — le journal brut, du premier au dernier scan. Toucher une ligne ouvre aussi la fiche.</li>
+      </ul>
+
+      <div class="note">
+        <p>
+          Le bandeau <strong>«&nbsp;Connexion perdue&nbsp;»</strong> qui peut
+          apparaître en haut de l'écran signale une coupure réseau&nbsp;: les
+          écrans se rafraîchissent dès que la connexion revient, sans rien
+          recharger.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="kiosque">
+      <h2><span class="n">04</span>Le kiosque</h2>
+      <p class="lead">
+        Le kiosque, c'est l'écran posé dans la boutique&nbsp;: un QR code géant
+        et les six caractères du moment. C'est la seule façon de pointer, et
+        c'est ce qui rend le pointage impossible à falsifier à distance.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Kiosque<span class="url">/admin/kiosque</span></div>
+        <div class="body">
+          <div class="kiosk">
+            <p class="wordmark" style="font-size:.7rem;color:#737373;margin:0 0 .6rem">Padretar</p>
+            <div class="qr">
+              <svg viewBox="0 0 21 21" width="100%" height="100%" role="img" aria-label="Aperçu de QR code">
+                <rect width="21" height="21" fill="#fff"/>
+                <g fill="#000">
+                  <rect x="0" y="0" width="7" height="7"/><rect x="1" y="1" width="5" height="5" fill="#fff"/><rect x="2" y="2" width="3" height="3"/>
+                  <rect x="14" y="0" width="7" height="7"/><rect x="15" y="1" width="5" height="5" fill="#fff"/><rect x="16" y="2" width="3" height="3"/>
+                  <rect x="0" y="14" width="7" height="7"/><rect x="1" y="15" width="5" height="5" fill="#fff"/><rect x="2" y="16" width="3" height="3"/>
+                  <rect x="9" y="1" width="1" height="1"/><rect x="11" y="1" width="1" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="12" y="3" width="1" height="1"/>
+                  <rect x="10" y="4" width="1" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="12" y="5" width="1" height="1"/>
+                  <rect x="9" y="8" width="1" height="1"/><rect x="11" y="8" width="1" height="1"/><rect x="13" y="8" width="1" height="1"/>
+                  <rect x="8" y="9" width="1" height="1"/><rect x="10" y="9" width="1" height="1"/><rect x="12" y="9" width="1" height="1"/>
+                  <rect x="9" y="10" width="1" height="1"/><rect x="13" y="10" width="1" height="1"/>
+                  <rect x="8" y="12" width="1" height="1"/><rect x="11" y="12" width="1" height="1"/><rect x="14" y="12" width="1" height="1"/>
+                  <rect x="9" y="13" width="1" height="1"/><rect x="12" y="13" width="1" height="1"/>
+                  <rect x="15" y="9" width="1" height="1"/><rect x="17" y="9" width="1" height="1"/><rect x="19" y="9" width="1" height="1"/>
+                  <rect x="16" y="10" width="1" height="1"/><rect x="18" y="10" width="1" height="1"/>
+                  <rect x="15" y="11" width="1" height="1"/><rect x="17" y="11" width="1" height="1"/>
+                  <rect x="8" y="15" width="1" height="1"/><rect x="10" y="15" width="1" height="1"/><rect x="12" y="15" width="1" height="1"/><rect x="14" y="15" width="1" height="1"/>
+                  <rect x="9" y="16" width="1" height="1"/><rect x="13" y="16" width="1" height="1"/><rect x="15" y="16" width="1" height="1"/>
+                  <rect x="8" y="17" width="1" height="1"/><rect x="11" y="17" width="1" height="1"/><rect x="14" y="17" width="1" height="1"/>
+                  <rect x="10" y="18" width="1" height="1"/><rect x="12" y="18" width="1" height="1"/><rect x="15" y="18" width="1" height="1"/>
+                  <rect x="16" y="19" width="1" height="1"/><rect x="18" y="19" width="1" height="1"/>
+                  <rect x="17" y="20" width="1" height="1"/><rect x="19" y="20" width="1" height="1"/>
+                </g>
+              </svg>
+            </div>
+            <p class="hint">ou saisissez ce code</p>
+            <p class="code" style="color:#fff">K7M2QP</p>
+          </div>
+        </div>
+        <figcaption>Le kiosque : noir, un QR, et le même code en clair pour qui préfère le taper.</figcaption>
+      </figure>
+
+      <h3>Ce qu'il fait tout seul</h3>
+      <ul class="clean">
+        <li><strong>Il change de code toutes les 30 secondes.</strong> Le code affiché n'est valable qu'une minute&nbsp;: une photo prise hier ne sert à rien, et un employé ne peut pas pointer depuis chez lui.</li>
+        <li><strong>Il empêche l'écran de veille.</strong> Tant qu'il est ouvert, la tablette reste allumée&nbsp;: un kiosque endormi, c'est un kiosque où personne ne peut pointer.</li>
+        <li><strong>Il verrouille l'application.</strong> Ouvrir le kiosque verrouille tout le reste&nbsp;: le bouton retour, l'adresse tapée à la main, tout y ramène. C'est voulu, l'écran reste sans surveillance sous une session de responsable.</li>
+      </ul>
+
+      <h3>Sortir du kiosque</h3>
+      <ol class="steps">
+        <li><b>Touchez le cadenas en haut à droite</b></li>
+        <li><b>Entrez le mot de passe de sortie</b> Celui que vous avez choisi sur le tableau de bord (6 caractères minimum), ou votre mot de passe de compte si vous n'en avez pas choisi.</li>
+        <li><b>Vous revenez sur le tableau de bord</b> L'écran se déverrouille. Rouvrir le kiosque le reverrouille et repart sur un code neuf.</li>
+      </ol>
+
+      <div class="warn">
+        <p>
+          <strong>N'utilisez pas votre mot de passe de compte comme mot de passe
+          de sortie.</strong> Il sera tapé en public, devant les employés, sur un
+          écran de boutique. Choisissez-en un dédié, court mais devinable par
+          personne (par exemple un mot sans rapport avec la boutique), et
+          changez-le quand quelqu'un qui le connaît s'en va.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="pointer">
+      <h2><span class="n">05</span>Pointer, côté employé</h2>
+      <p class="lead">
+        L'employé se connecte avec son propre compte&nbsp;; il voit s'il est
+        dedans ou dehors et appuie sur un seul bouton. Il n'a besoin de rien
+        d'autre, et il ne peut modifier ni ses heures ni son profil.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Pointage — vue employé<span class="url">/</span></div>
+        <div class="body">
+          <div class="phone"><div class="scr">
+            <div class="pill-state" style="background:var(--fg);color:var(--bg);border-color:var(--fg)">
+              <p style="color:#555">Vous êtes</p>
+              <b>Dedans</b>
+              <p style="color:#444;text-transform:none;letter-spacing:0;font-size:.68rem;margin-top:.2rem">Entré à 08:12 · 4h05 sur place</p>
+            </div>
+            <div class="bigbtn">Pointer ma sortie</div>
+            <div class="h" style="margin-top:.6rem"><span>Mes pointages</span></div>
+            <div class="card">
+              <div class="punch"><span class="ic in">↓</span><span><b style="font-size:.62rem;letter-spacing:.12em" class="enter">ENTRÉE</b><small class="dim" style="display:block;font-variant-numeric:tabular-nums;color:var(--fg)">08:12</small></span></div>
+              <div class="punch"><span class="ic out">↑</span><span><b style="font-size:.62rem;letter-spacing:.12em" class="exitc">SORTIE</b><small class="dim" style="display:block;font-variant-numeric:tabular-nums;color:var(--fg)">12:04</small></span><span class="pencil">4h52</span></div>
+              <div class="punch"><span class="ic in">↓</span><span><b style="font-size:.62rem;letter-spacing:.12em" class="enter">ENTRÉE</b><small class="dim" style="display:block;font-variant-numeric:tabular-nums;color:var(--fg)">13:30</small></span></div>
+            </div>
+          </div></div>
+        </div>
+        <figcaption>Vue employé, sur téléphone : l'état en grand, un bouton, les derniers pointages.</figcaption>
+      </figure>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Pointer<span class="url">dialogue</span></div>
+        <div class="body">
+          <div class="dlg" style="max-width:16rem">
+            <h5>Pointer</h5>
+            <p class="desc" style="text-transform:none">Scannez le QR affiché en boutique, ou tapez le code en dessous.</p>
+            <div style="aspect-ratio:1;border:1px solid #333;border-radius:.4rem;background:#000;display:grid;place-items:center;color:#555;font-size:.7rem">caméra</div>
+            <div style="display:flex;gap:.3rem;margin-top:.5rem">
+              <div class="input" style="flex:1;letter-spacing:.3em;font-variant-numeric:tabular-nums">K7M2QP</div>
+              <div class="btn primary">Valider</div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Le scan et la saisie du code mènent au même endroit : deux gestes, un seul pointage.</figcaption>
+      </figure>
+
+      <h3>Les trois façons de pointer</h3>
+      <ul class="clean">
+        <li><strong>Scanner le QR</strong> avec l'appareil photo, en visant l'écran du kiosque.</li>
+        <li><strong>Taper les six caractères</strong> affichés sous le QR&nbsp;: utile si la caméra est refusée, absente, ou si l'on est pressé. Les lettres I, O et les chiffres 0 et 1 n'existent jamais dans ces codes, pour éviter les confusions à l'oral.</li>
+        <li><strong>Lire le code à voix haute</strong> et le faire taper par un collègue, quand une seule personne a un téléphone.</li>
+      </ul>
+
+      <div class="note">
+        <p>
+          <strong>Entrée ou sortie&nbsp;?</strong> L'application le décide seule,
+          en alternant&nbsp;: la première fois de la journée c'est une entrée,
+          la suivante une sortie. Un scan répété dans les quinze secondes
+          n'ajoute rien&nbsp;: c'est le même geste vu deux fois par la caméra.
+          Si un employé a réellement scanné deux fois dans la journée, corrigez
+          depuis sa fiche (section 07).
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="comptes">
+      <h2><span class="n">06</span>Gérer les comptes</h2>
+      <p class="lead">
+        Menu <strong>Employés</strong>&nbsp;: tous les comptes, les inscriptions
+        en attente en tête. Chaque carte porte les actions de son état&nbsp;:
+        valider, désactiver ou réactiver, et — nouveauté — supprimer.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Employés<span class="url">/admin/employes</span></div>
+        <div class="body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+            <div class="ecard">
+              <div class="topline"><span class="name">Nadia El Fassi</span><span class="badge">En attente</span></div>
+              <p class="sub">nadia@boutique.ma</p>
+              <div class="acts"><span class="btn primary">Valider</span><span class="btn ghost">Supprimer</span></div>
+            </div>
+            <div class="ecard">
+              <div class="topline"><span class="name">Amina Benali</span><span class="badge solid">Actif</span></div>
+              <p class="sub">Vendeuse · amina@boutique.ma</p>
+              <div class="acts"><span class="btn">Désactiver</span></div>
+            </div>
+            <div class="ecard">
+              <div class="topline"><span class="name">Salma Idrissi</span><span class="badge">Désactivé</span></div>
+              <p class="sub">Caissière · salma@boutique.ma</p>
+              <div class="acts"><span class="btn">Réactiver</span></div>
+            </div>
+            <div class="ecard">
+              <div class="topline"><span class="name">Karim Zouhdi</span><span class="badge">En attente</span></div>
+              <p class="sub">doublon créé le 12 · karim@boutique.ma</p>
+              <div class="acts"><span class="btn primary">Valider</span><span class="btn ghost">Supprimer</span></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Chaque carte montre ce que l'on peut faire, et seulement cela : un compte avec un relevé n'affiche pas « Supprimer ».</figcaption>
+      </figure>
+
+      <h3>Valider une inscription</h3>
+      <p>
+        Un nouvel employé apparaît en <strong>«&nbsp;En attente&nbsp;»</strong>.
+        Touchez <strong>Valider</strong>&nbsp;: son accès est immédiat, il peut
+        pointer. Tant qu'il n'est pas validé, il voit seulement l'écran
+        d'attente et ne peut rien faire d'autre.
+      </p>
+
+      <h3>Retirer l'accès : désactiver</h3>
+      <p>
+        C'est le geste normal quand quelqu'un part, se met en congé long ou doit
+        être suspendu. <strong>Désactiver</strong> coupe la connexion
+        immédiatement, sans toucher à son relevé&nbsp;: ses heures restent dans
+        les totaux et dans les exports. <strong>Réactiver</strong> rétablit
+        l'accès, avec le même mot de passe.
+      </p>
+
+      <h3>Supprimer un compte <span class="tag new">Disponible depuis la liste</span></h3>
+      <p>
+        Le bouton <strong>Supprimer</strong> apparaît à côté de
+        <strong>Désactiver</strong>, sur la carte comme sur la fiche. Il sert
+        aux <em>comptes qui n'ont jamais pointé</em>&nbsp;: inscription en
+        double, faute de frappe dans l'email, compte de test, ancien employé
+        recréé au bon nom.
+      </p>
+      <p>
+        Une confirmation s'ouvre&nbsp;: «&nbsp;Supprimer ce compte&nbsp;?
+        Irréversible.&nbsp;» Une fois confirmé, le compte, sa session et son mot
+        de passe disparaissent — l'email redevient libre pour une nouvelle
+        inscription.
+      </p>
+
+      <div class="warn">
+        <p>
+          <strong>Le bouton n'apparaît pas&nbsp;? C'est une règle, pas un bug.</strong>
+          Trois cas refusent la suppression, et la refusent aussi côté serveur
+          même si l'on contourne l'écran&nbsp;:
+        </p>
+        <ul class="clean">
+          <li>le compte a <strong>au moins un pointage</strong> — une heure de travail est une pièce de paie, on la conserve&nbsp;; désactivez dans ce cas&nbsp;;</li>
+          <li>c'est <strong>votre propre compte</strong> — on ne se supprime pas soi-même&nbsp;;</li>
+          <li>c'est le <strong>dernier administrateur actif</strong> — nommez quelqu'un d'autre d'abord.</li>
+        </ul>
+      </div>
+
+      <div class="tip">
+        <p>
+          <strong>Supprimer un compte qui a pointé quand même&nbsp;?</strong>
+          C'est possible, mais volontairement en deux temps&nbsp;: effacez ses
+          pointages un par un depuis sa fiche (crayon → « Supprimer ce
+          pointage »), puis le bouton de suppression réapparaît une fois le
+          relevé vide. Ce détour est là pour qu'aucune heure ne disparaisse
+          par un seul clic.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="fiche">
+      <h2><span class="n">07</span>La fiche employé : heures, corrections, mot de passe</h2>
+      <p class="lead">
+        Touchez un nom dans la liste (ou une ligne du tableau de bord) pour
+        ouvrir sa fiche. C'est là que tout se corrige&nbsp;: identité, mot de
+        passe, totaux, et chaque pointage individuellement.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Fiche employé<span class="url">/admin/employes/:id</span></div>
+        <div class="body">
+          <div style="display:flex;justify-content:space-between;align-items:end;gap:.5rem;margin-bottom:.6rem">
+            <div>
+              <p class="dim" style="margin:0;font-size:.55rem;letter-spacing:.2em;text-transform:uppercase">Fiche employé</p>
+              <p style="margin:.1rem 0 0;font-size:1rem;font-weight:600">Amina Benali</p>
+              <p class="dim" style="margin:0;font-size:.72rem">Vendeuse</p>
+            </div>
+            <span class="btn primary">Enregistrer</span>
+          </div>
+          <div class="totals">
+            <span class="tot">Cette semaine <b>32h15</b></span>
+            <span class="tot">Ce mois-ci <b>141h40</b></span>
+            <span class="btn">Exporter (Excel)</span>
+          </div>
+          <div class="h"><span>Pointages</span><span class="btn">+ Ajouter un pointage</span></div>
+          <div class="month">
+            <div class="mh"><b>Août 2026</b><span class="dim" style="font-variant-numeric:tabular-nums">21 &nbsp;·&nbsp; 148h05 ⌄</span></div>
+            <div class="punch"><span class="ic in">↓</span><span><b style="font-size:.6rem;letter-spacing:.12em" class="enter">ENTRÉE</b><small style="display:block;color:var(--fg);font-variant-numeric:tabular-nums">08:12</small></span><span class="pencil">✎</span></div>
+            <div class="punch"><span class="ic out">↑</span><span><b style="font-size:.6rem;letter-spacing:.12em" class="exitc">SORTIE</b><small style="display:block;color:var(--fg);font-variant-numeric:tabular-nums">12:04</small></span><span class="pencil">4h52</span></div>
+            <div class="punch"><span class="ic in">↓</span><span><b style="font-size:.6rem;letter-spacing:.12em" class="enter">ENTRÉE</b><small style="display:block;color:var(--fg);font-variant-numeric:tabular-nums">13:30</small></span><span class="pencil">✎</span></div>
+          </div>
+          <p class="dim" style="font-size:.68rem;margin:.4rem 0 0">+ Ajouter un pointage</p>
+        </div>
+        <figcaption>La fiche : identité, totaux de la semaine et du mois, relevé mois par mois, un crayon par pointage.</figcaption>
+      </figure>
+
+      <h3>Corriger une heure, un type, ou une date</h3>
+      <p>
+        Chaque pointage a un <strong>crayon</strong>. Touchez-le&nbsp;: une
+        fenêtre s'ouvre avec trois champs — <strong>Type</strong>
+        (Entrée/Sortie), <strong>Date</strong> et <strong>Heure</strong>. Changez
+        ce qui est faux et enregistrez. La date est corrigeable aussi&nbsp;: un
+        pointage fait le mauvais jour peut être déplacé sur le bon.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Corriger ce pointage<span class="url">dialogue</span></div>
+        <div class="body">
+          <div class="dlg">
+            <h5>Corriger ce pointage</h5>
+            <p class="desc">Lundi 24 août</p>
+            <div class="field"><label>Type</label><div class="input">Entrée</div></div>
+            <div class="field"><label>Date</label><div class="input" style="font-variant-numeric:tabular-nums">2026-08-24</div></div>
+            <div class="field"><label>Heure</label><div class="input" style="font-variant-numeric:tabular-nums">08:12</div></div>
+            <div class="foot">
+              <div class="btn primary">Enregistrer</div>
+              <div class="btn">Supprimer ce pointage</div>
+            </div>
+          </div>
+        </div>
+        <figcaption>Un seul dialogue pour tout&nbsp;: corriger, déplacer, ou supprimer un pointage.</figcaption>
+      </figure>
+
+      <h3>Ajouter un pointage oublié</h3>
+      <p>
+        Deux entrées possibles, et les deux acceptent n'importe quelle date
+        jusqu'à aujourd'hui&nbsp;:
+      </p>
+      <ul class="clean">
+        <li><strong>«&nbsp;Ajouter un pointage&nbsp;» en haut de la liste</strong> — pour un jour où le kiosque n'a jamais été vu&nbsp;; fonctionne même si l'employé n'a aucun pointage.</li>
+        <li><strong>«&nbsp;Ajouter un pointage&nbsp;» sous un jour</strong> — la date du jour est déjà remplie, il ne reste que l'heure à saisir.</li>
+      </ul>
+      <p>
+        Une journée incomplète (une entrée sans sortie) est signalée par un
+        <strong>astérisque</strong> à côté du total&nbsp;: le total est
+        sous-évalué. C'est le premier signe d'un oubli de pointage.
+      </p>
+
+      <h3>Réinitialiser un mot de passe</h3>
+      <p>
+        Il n'y a pas de «&nbsp;mot de passe oublié&nbsp;» par email, et c'est
+        volontaire&nbsp;: tout le monde partage la même pièce. Quand un employé
+        ne peut plus se connecter, vous lui donnez un nouveau mot de passe
+        depuis sa fiche, à l'écran, et vous le lui dites de vive voix. Toutes
+        ses sessions ouvertes sont fermées au passage — un téléphone resté
+        connecté perd l'accès que la réinitialisation devait reprendre.
+      </p>
+      <div class="note">
+        <p>
+          <strong>Et votre propre mot de passe&nbsp;?</strong> Personne ne peut
+          le réinitialiser à votre place, puisque vous êtes le sommet. Il se
+          remet depuis un terminal, avec la commande de la section 11. C'est le
+          seul cas qui demande une intervention technique.
+        </p>
+      </div>
+
+      <h3>Corriger le nom ou le poste</h3>
+      <p>
+        Modifiez le champ puis <strong>Enregistrer</strong>. Le poste apparaît
+        sous le nom sur le tableau de bord et dans la liste&nbsp;; il est utile
+        quand plusieurs métiers se croisent (vendeur, caisse, livraison). Le
+        rôle <em>admin</em> se donne également ici, mais ne nommez un second
+        administrateur que si la personne doit vraiment gérer les comptes et
+        les heures des autres.
+      </p>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="export">
+      <h2><span class="n">08</span>Exporter pour la paie</h2>
+      <p class="lead">
+        Un seul fichier Excel par export, avec les heures de tout le monde ou
+        d'une seule personne, sur la période que vous choisissez.
+      </p>
+
+      <figure class="shot">
+        <div class="shot-bar"><span class="dots"><i></i><i></i><i></i></span>Exporter les pointages<span class="url">dialogue</span></div>
+        <div class="body">
+          <div class="dlg" style="max-width:17rem">
+            <h5>Exporter les pointages</h5>
+            <p class="desc" style="text-transform:none">Une ou plusieurs périodes pour tous les employés, dans un seul fichier.</p>
+            <div class="tabs"><span class="tab on">Semaine</span><span class="tab">Mois</span><span class="tab">Année</span></div>
+            <div class="opt"><span class="boxc on"></span>semaine du 17 août</div>
+            <div class="opt"><span class="boxc on"></span>semaine du 10 août</div>
+            <div class="opt"><span class="boxc"></span>semaine du 3 août</div>
+            <div style="display:flex;gap:.3rem;margin-top:.5rem">
+              <div class="input" style="flex:1">du 01/08/2026</div>
+              <div class="input" style="flex:1">au 31/08/2026</div>
+            </div>
+            <p class="dim" style="font-size:.66rem;margin:.45rem 0 0">2 semaines + la plage libre · 12 employés · du 1 au 31 août</p>
+            <div class="foot"><div class="btn primary">Exporter (Excel)</div></div>
+          </div>
+        </div>
+        <figcaption>Le dialogue d'export : onglets par période, cases à cocher, et une plage de dates libre.</figcaption>
+      </figure>
+
+      <ol class="steps">
+        <li><b>Ouvrez l'export</b> Depuis le tableau de bord (carte <strong>Export</strong>) pour tous les employés, ou depuis une fiche (bouton <strong>Exporter (Excel)</strong>) pour cette personne seulement.</li>
+        <li><b>Cochez ce que vous voulez</b> Plusieurs semaines, plusieurs mois, plusieurs années — le cumul est permis. La plage «&nbsp;du … au …&nbsp;» s'ajoute à la sélection.</li>
+        <li><b>Vérifiez la ligne de résumé</b> Elle annonce ce que le fichier contiendra avant de le construire. Rien ne part sans avoir été écrit à l'écran.</li>
+        <li><b>Téléchargez</b> Le fichier porte la période dans son nom&nbsp;: on sait ce qu'il y a dedans sans l'ouvrir.</li>
+      </ol>
+
+      <div class="note">
+        <p>
+          <strong>Pas de bouton d'export&nbsp;?</strong> L'export fait partie du
+          forfait. Quand il n'est pas inclus, l'écran le dit en clair à la place
+          du bouton, plutôt que de proposer un clic que le serveur refuserait.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="forfait">
+      <h2><span class="n">09</span>Forfait et limites</h2>
+      <p class="lead">
+        Trois réglages décident de ce que l'application autorise. Ils sont posés
+        une fois à l'installation, côté hébergement, et ne se changent pas depuis
+        l'écran — c'est voulu&nbsp;: un compte ne peut pas élargir son propre
+        forfait.
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Réglage</th><th>Ce qu'il fait</th><th>Quand il se voit</th></tr></thead>
+          <tbody>
+            <tr><td><code>MAX_EMPLOYEES</code></td><td>Nombre maximum de comptes actifs</td><td>Un message « Limite de N employés atteinte » au moment de valider ou de réactiver</td></tr>
+            <tr><td><code>CSV_EXPORT</code></td><td>Active le bouton d'export Excel</td><td>Le bouton est remplacé par « L'export n'est pas inclus dans ce forfait »</td></tr>
+            <tr><td><code>RETENTION_MONTHS</code></td><td>Profondeur d'historique proposée à l'export</td><td>Les périodes plus anciennes n'apparaissent pas dans le sélecteur</td></tr>
+            <tr><td><code>ADMIN_EMAIL</code></td><td>Adresses qui deviennent administratrices à l'inscription</td><td>Utile seulement pour forcer un compte précis sur une instance déjà en service</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tip">
+        <p>
+          <strong>Besoin de plus de place&nbsp;?</strong> On ne supprime pas des
+          heures pour rester sous la limite&nbsp;: on désactive les comptes des
+          personnes parties. Un compte désactivé ne compte plus dans les
+          employés actifs, et son relevé reste exportable.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="depannage">
+      <h2><span class="n">10</span>Dépannage</h2>
+      <p class="lead">
+        Les onze cas qui reviennent. Chacun se règle en moins d'une minute, et
+        aucun ne demande de recommencer la journée.
+      </p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Symptôme</th><th>Cause la plus probable</th><th>Quoi faire</th></tr></thead>
+          <tbody>
+            <tr><td>« Code invalide ou expiré »</td><td>Le code a changé pendant la saisie (30 s)</td><td>Relire l'écran du kiosque et retaper les six caractères affichés maintenant</td></tr>
+            <tr><td>La caméra ne s'ouvre pas</td><td>Caméra refusée, absente, ou adresse non sécurisée</td><td>Autoriser la caméra pour le site, ou taper le code&nbsp;; en http le scan ne peut pas fonctionner, il faut https</td></tr>
+            <tr><td>Le QR ne se scanne pas</td><td>Reflet, écran sale, luminosité</td><td>Nettoyer l'écran du kiosque, redresser le téléphone, ou taper le code</td></tr>
+            <tr><td>Un employé est bloqué sur « en attente »</td><td>Son compte n'a pas été validé</td><td>Employés → sa carte → <strong>Valider</strong></td></tr>
+            <tr><td>Un employé est bloqué sur « accès désactivé »</td><td>Compte désactivé</td><td>Employés → <strong>Réactiver</strong></td></tr>
+            <tr><td>Pas de bouton « Supprimer »</td><td>Le compte a des pointages, ou c'est le vôtre, ou le dernier admin</td><td>Désactiver au lieu de supprimer — c'est la voie prévue</td></tr>
+            <tr><td>Heures fausses sur une journée</td><td>Scan oublié, doublé, ou mauvais type</td><td>Fiche → crayon sur le pointage → corriger heure, type ou date</td></tr>
+            <tr><td>Journée marquée d'un astérisque</td><td>Entrée sans sortie</td><td>Ajouter la sortie manquante, ou la sortie oubliée sur le bon jour</td></tr>
+            <tr><td>Le total du jour ne bouge pas</td><td>Coupure réseau</td><td>Attendre le retour du bandeau&nbsp;; la valeur se recalcule seule</td></tr>
+            <tr><td>Kiosque figé ou écran noir</td><td>Onglet en veille, tablette déchargée</td><td>Rallumer, rouvrir l'adresse&nbsp;: le code repart aussitôt</td></tr>
+            <tr><td>Mot de passe oublié</td><td>—</td><td>Employé&nbsp;: réinitialiser depuis sa fiche. Responsable&nbsp;: commande de secours, section 11</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="support">
+      <h2><span class="n">11</span>Support et coulisses</h2>
+      <p class="lead">
+        Ce que fait le responsable au quotidien est décrit plus haut. Cette
+        section est pour la personne qui héberge votre instance — souvent la
+        même au début.
+      </p>
+
+      <h3>Accès de secours au compte responsable</h3>
+      <p>
+        Il n'existe aucune autre porte&nbsp;: la réinitialisation passe par
+        l'hébergement, qui détient déjà la clé de la base.
+      </p>
+      <pre><code>npx convex run password:resetByEmail \
+  '{"email":"vous@boutique.ma","password":"nouveau-mot-de-passe"}' --prod</code></pre>
+      <p class="dim">Sans accès au terminal, la reprise se fait depuis le tableau de bord Convex du projet.</p>
+
+      <h3>Mise à jour de l'application</h3>
+      <p>
+        Un envoi de code sur la branche principale déclenche la construction de
+        l'image, puis le redéploiement chez l'hébergeur. Rien à faire à la main,
+        et aucune donnée n'est touchée&nbsp;: seuls le code et l'interface
+        changent.
+      </p>
+      <div class="warn">
+        <p>
+          <strong>Après une mise à jour, l'interface peut rester en cache.</strong>
+          Si un écran ne montre pas ce qu'il devrait, rechargez en forçant
+          (<code>Ctrl+Shift+R</code>, ou fermez puis rouvrez l'app ajoutée à
+          l'écran d'accueil)&nbsp;: le service worker sert sinon la version
+          précédente.
+        </p>
+      </div>
+
+      <h3>Qui contacter</h3>
+      <ul class="clean">
+        <li><strong>Un doute sur une heure ou un contrat</strong> — le responsable, pas le support&nbsp;: l'application enregistre, elle n'arbitre pas.</li>
+        <li><strong>L'application ne s'ouvre plus, le kiosque est noir, un export échoue</strong> — la personne qui héberge l'instance.</li>
+        <li><strong>Un besoin non couvert</strong> (nouvel onglet, autre format de fichier)</li>
+        <li><strong>La perte du dernier administrateur</strong> — cas technique, section ci-dessus&nbsp;: ne désactivez jamais le dernier compte admin sans en avoir nommé un autre.</li>
+      </ul>
+    </section>
+
+    <!-- ================================================================ -->
+    <section id="limites">
+      <h2><span class="n">12</span>Ce que l'app ne fait pas</h2>
+      <p class="lead">
+        Les limites sont volontaires. Les connaître évite de chercher un bouton
+        qui n'existe pas — et de croire à un bug.
+      </p>
+      <ul class="clean">
+        <li><strong>Pas de pointage hors ligne.</strong> Il faut le réseau et le code du moment&nbsp;: c'est ce qui empêche de pointer depuis ailleurs.</li>
+        <li><strong>Pas de pointage sans kiosque.</strong> Un employé ne peut pas valider sa journée depuis son propre téléphone&nbsp;; le code partagé est la preuve de présence.</li>
+        <li><strong>Pas de modification par l'employé.</strong> Il voit ses heures, il ne les change pas. Toute correction passe par un responsable.</li>
+        <li><strong>Pas de « mot de passe oublié » par email.</strong> La remise se fait en personne, ou par la commande de secours.</li>
+        <li><strong>Pas de suppression d'heures en masse.</strong> On corrige pointage par pointage&nbsp;; il n'y a pas de bouton « effacer la journée ».</li>
+        <li><strong>Pas de gestion multi-boutiques.</strong> Une instance = une boutique, un kiosque, une équipe.</li>
+        <li><strong>Pas de calcul de paie.</strong> L'application compte les heures et les exporte&nbsp;; les majorations, primes et retenues restent dans votre tableur.</li>
+      </ul>
+      <div class="note">
+        <p>
+          <strong>Une règle qui explique presque tout&nbsp;:</strong> l'application
+          conserve ce qui a été travaillé et refuse ce qui l'effacerait. D'où le
+          couple <em>désactiver / supprimer</em>, d'où la date qu'on corrige au
+          lieu de la journée qu'on jette.
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="wrap" style="border-top:1px solid var(--border);padding-top:1rem;padding-bottom:3rem">
+  <p class="dim" style="font-size:.75rem">
+    Padretar — Dar as Saada · Guide du responsable · Octobre 2026.
+    Les vignettes sont des reconstitutions fidèles de l'interface, avec des
+    données d'exemple.
+  </p>
+</footer>
+
+</body>
+</html>
