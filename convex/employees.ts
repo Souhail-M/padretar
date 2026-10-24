@@ -21,7 +21,13 @@ async function assertRoomForOneMore(ctx: MutationCtx) {
   }
 }
 
-/** Everyone, pending accounts first — those are the ones needing a decision. */
+/**
+ * Everyone, pending accounts first — those are the ones needing a decision.
+ *
+ * `hasPunches` is what lets the list offer deletion in place: the same guard
+ * `remove` enforces in the database (no work record = deletable), answered
+ * once per row so the screen never draws a button the server will refuse.
+ */
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -29,20 +35,27 @@ export const list = query({
     const users = (await ctx.db.query("users").collect()).filter((u) => !isHidden(u));
 
     const rank = { pending: 0, active: 1, disabled: 2 } as const;
-    return users
-      .map((u) => ({
-        _id: u._id,
-        nom: u.nom ?? "",
-        email: u.email ?? "",
-        poste: u.poste ?? "",
-        role: u.role,
-        status: u.status,
-      }))
-      .sort(
+    return (
+      await Promise.all(
+        users.map(async (u) => ({
+          _id: u._id,
+          nom: u.nom ?? "",
+          email: u.email ?? "",
+          poste: u.poste ?? "",
+          role: u.role,
+          status: u.status,
+          hasPunches:
+            (await ctx.db
+              .query("badges")
+              .withIndex("by_user_at", (q) => q.eq("userId", u._id))
+              .first()) !== null,
+        })),
+      )
+    ).sort(
         (a, b) =>
           rank[a.status] - rank[b.status] ||
           (a.nom || a.email).localeCompare(b.nom || b.email),
-      );
+        );
   },
 });
 
