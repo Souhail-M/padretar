@@ -7,10 +7,16 @@
 services:
   web:
     image: ghcr.io/souhail-m/padretar:latest
-    # :latest is a moving tag, and Docker will happily reuse a local copy under
-    # that name — a deploy then "succeeds" while still running the previous
-    # build. Caught on KatabAI, where a green build kept serving the old image.
-    pull_policy: always
+
+    # GitHub Actions is billing-locked, so Coolify builds the image here, on
+    # the server, from the same Dockerfile. `image` is only the local tag now;
+    # nothing is pulled from GHCR. Once Actions can run again, remove this
+    # block and restore `pull_policy: always`.
+    build:
+      context: .
+      args:
+        VITE_CONVEX_URL: https://hardy-dragon-575.eu-west-1.convex.cloud
+
     restart: unless-stopped
 
     # NOTE: no SERVICE_FQDN_WEB_80 here, on purpose.
