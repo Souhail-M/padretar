@@ -12,6 +12,7 @@ import { Dashboard } from "@/pages/admin/Dashboard";
 import { Employees } from "@/pages/admin/Employees";
 import { EmployeeDetail } from "@/pages/admin/EmployeeDetail";
 import { Kiosk } from "@/pages/admin/Kiosk";
+import { Proposition } from "@/pages/Proposition";
 import { Toaster } from "@/components/ui/sonner";
 import { useKioskLock } from "@/lib/useKioskLock";
 
@@ -107,6 +108,19 @@ function Authed() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+
+  // The proposal is read before an account exists, so it sits outside all
+  // three auth gates: no session, no Convex query, no sign-in screen.
+  if (pathname === "/proposition") {
+    return (
+      <>
+        <Proposition />
+        <Toaster />
+      </>
+    );
+  }
+
   return (
     <>
       <AuthLoading>

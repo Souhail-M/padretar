@@ -1,0 +1,92 @@
+/* The proposal is a printed report, read top to bottom. These rules carry the
+   only motion on the page: the reveal as a section enters, the Telegram
+   crossfade, and the reduced-motion fallbacks that keep every word visible. */
+
+html:has(.proposition) {
+  scroll-behavior: smooth;
+}
+
+.proposition ::selection {
+  background: #fafafa;
+  color: #0a0a0a;
+}
+
+@keyframes proposition-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.proposition .rise {
+  animation: proposition-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.proposition .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.proposition .reveal.is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+.proposition .tg-layer {
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+
+.proposition .tg-layer.is-visible {
+  opacity: 1;
+}
+
+.proposition .faq-columns {
+  columns: 2;
+  column-gap: 3.5rem;
+}
+
+.proposition .faq-columns > p {
+  break-inside: avoid;
+  margin: 0 0 1.25rem;
+}
+
+.proposition a:focus-visible,
+.proposition button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+@media (max-width: 767px) {
+  .proposition .faq-columns {
+    columns: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.proposition) {
+    scroll-behavior: auto;
+  }
+
+  .proposition .rise {
+    animation: none;
+  }
+
+  .proposition .reveal,
+  .proposition .reveal.is-shown {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .proposition .tg-layer {
+    transition: none;
+  }
+}
